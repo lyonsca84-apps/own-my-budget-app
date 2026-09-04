@@ -1,4 +1,5 @@
-import { ScrollView, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   DEMO_DATA,
@@ -11,8 +12,10 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { StatusPill, type StatusTone } from '@/components/ui/status-pill';
+import { useAuth } from '@/contexts/auth-context';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 const BILL_STATUS_TONE: Record<BillStatus, StatusTone> = {
@@ -28,7 +31,10 @@ const BILL_STATUS_LABEL: Record<BillStatus, string> = {
 };
 
 export default function HomeScreen() {
+  const { status, user } = useAuth();
   const { profile, account, incomeSources, bills } = DEMO_DATA;
+  const avatarName =
+    status === 'signedIn' ? (user?.email ?? profile.displayName) : profile.displayName;
   const unpaidBillsTotal = sumUnpaidBills(DEMO_DATA);
   const debtTotal = sumDebtBalances(DEMO_DATA);
   const savingsTotal = sumSavingsSaved(DEMO_DATA);
@@ -53,13 +59,28 @@ export default function HomeScreen() {
               gap: Spacing.four,
             }}
           >
-            <View>
-              <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
-                Hello, {profile.displayName}
-              </ThemedText>
-              <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.half }}>
-                Here&apos;s a clear look at your money right now.
-              </ThemedText>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+              }}
+            >
+              <View style={{ flexShrink: 1 }}>
+                <ThemedText type="title" style={{ fontSize: 28, lineHeight: 34 }}>
+                  Hello, {profile.displayName}
+                </ThemedText>
+                <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.half }}>
+                  Here&apos;s a clear look at your money right now.
+                </ThemedText>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+                onPress={() => router.push('/settings')}
+              >
+                <Avatar name={avatarName} />
+              </Pressable>
             </View>
 
             <View

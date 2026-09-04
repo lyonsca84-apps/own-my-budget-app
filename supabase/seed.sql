@@ -4,10 +4,19 @@
 -- Passwords are throwaway values; nobody should ever sign in as these users
 -- outside of local/staging RLS testing.
 
+-- Every one of these empty-string columns matters: GoTrue's Go driver scans
+-- them as non-nullable strings, and a NULL here breaks with "converting
+-- NULL to string is unsupported" on the *next* login attempt for that user
+-- — discovered the hard way when Phase 3's real sign-in test hit exactly
+-- this on these two seeded rows. Never leave them as NULL (the column
+-- default) in a hand-written auth.users insert.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at,
-  raw_app_meta_data, raw_user_meta_data
+  raw_app_meta_data, raw_user_meta_data,
+  confirmation_token, recovery_token, email_change,
+  email_change_token_new, email_change_token_current,
+  phone_change, phone_change_token, reauthentication_token
 ) values
 (
   '00000000-0000-0000-0000-000000000000',
@@ -16,7 +25,8 @@ insert into auth.users (
   'test-user-a@ownmybudget.test',
   crypt('Test-Password-A-1!', gen_salt('bf')),
   now(), now(), now(),
-  '{"provider":"email","providers":["email"]}', '{}'
+  '{"provider":"email","providers":["email"]}', '{}',
+  '', '', '', '', '', '', '', ''
 ),
 (
   '00000000-0000-0000-0000-000000000000',
@@ -25,7 +35,8 @@ insert into auth.users (
   'test-user-b@ownmybudget.test',
   crypt('Test-Password-B-1!', gen_salt('bf')),
   now(), now(), now(),
-  '{"provider":"email","providers":["email"]}', '{}'
+  '{"provider":"email","providers":["email"]}', '{}',
+  '', '', '', '', '', '', '', ''
 );
 -- The on_auth_user_created trigger fires here, creating each user's
 -- profiles / user_settings / notification_preferences / entitlements rows.

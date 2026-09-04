@@ -29,7 +29,7 @@ export function Button({ label, variant = 'primary', ...props }: ButtonProps) {
         backgroundColor: isPrimary ? theme.primary : 'transparent',
         borderWidth: isPrimary ? 0 : 1,
         borderColor: theme.primary,
-        opacity: pressed ? 0.85 : 1,
+        opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1,
       })}
       {...props}
     >

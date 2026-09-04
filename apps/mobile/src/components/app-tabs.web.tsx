@@ -5,6 +5,7 @@ import { Pressable, useWindowDimensions, View, type ViewStyle } from 'react-nati
 import { Avatar } from '@/components/ui/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/contexts/auth-context';
 import { NAV_ITEMS } from '@/constants/nav';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -106,27 +107,47 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
       {isWide && (
         <View style={{ marginTop: 'auto', gap: Spacing.two }}>
           <BudgetBuddyUpsellCard />
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: Spacing.two,
-              padding: Spacing.two,
-            }}
-          >
-            <Avatar name="Jordan" size={28} />
-            <View>
-              <ThemedText type="small" style={{ fontWeight: '700' }}>
-                Guest mode
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Demo data
-              </ThemedText>
-            </View>
-          </View>
+          <AccountSummary />
         </View>
       )}
     </View>
+  );
+}
+
+function AccountSummary() {
+  const { status, user, exitGuestMode, signOut } = useAuth();
+  const isGuest = status === 'guest';
+  const name = isGuest ? 'Guest mode' : (user?.email?.split('@')[0] ?? 'Account');
+
+  return (
+    <Pressable
+      onPress={() => {
+        // RootNavigator's Stack.Protected guard swaps to (auth) automatically
+        // once status changes — no manual navigation needed here.
+        if (isGuest) {
+          exitGuestMode();
+        } else {
+          signOut();
+        }
+      }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.two,
+        padding: Spacing.two,
+        borderRadius: Spacing.three,
+      }}
+    >
+      <Avatar name={name} size={28} />
+      <View>
+        <ThemedText type="small" style={{ fontWeight: '700' }}>
+          {name}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {isGuest ? 'Demo data — tap to create an account' : 'Tap to log out'}
+        </ThemedText>
+      </View>
+    </Pressable>
   );
 }
 

@@ -22,7 +22,10 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 - [ ] GitHub repo URL — user has a GitHub account, repo status/link not yet confirmed
 - [x] Supabase organization/project — org already existed (`lyonsca84-apps's Org`); created a brand-new project ("Own My Budget", `soapkqeaodjawxrvslob`, us-east-2) rather than reusing two unrelated pre-existing projects found in the account
-- [ ] Enable "leaked password protection" in Supabase Auth settings (dashboard toggle, off by default) before Phase 3 ships real sign-up
+- [ ] Enable "leaked password protection" in Supabase Auth settings (dashboard toggle, off by default) before real users can sign up
+- [ ] Configure a real SMTP provider for Supabase Auth emails before launch — the default shared email service has a very low send-rate limit (hit during Phase 3 testing); see `docs/auth-setup.md`
+- [ ] Google OAuth needs a Google Cloud Console OAuth client (see `docs/auth-setup.md`) — code is ready, provider isn't configured yet
+- [ ] Sign in with Apple needs the Apple Developer Program membership (below) plus Services ID/key setup (see `docs/auth-setup.md`) — code is ready, provider isn't configured yet
 - [ ] Final logo, app icon, support email — user will provide later
 - [ ] Domain connection (user owns a domain; exact spelling to confirm before DNS/App Store Connect setup)
 - [ ] Apple Developer Program account — not yet created (needed before iOS TestFlight/App Store submission, not before development)
@@ -88,7 +91,19 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 3 — Authentication, onboarding, profiles, session persistence, protected routes
 
-- [ ] Not started
+**Status: Complete**
+
+- [x] Scope decision: onboarding here is Welcome → Sign up/Login/Guest → dashboard, not the full 5-step data-entry wizard (pay schedule/balances/bills/goal) — that collects Phase 4 budgeting data and belongs there. Account deletion is explicitly Phase 7's, not this phase's.
+- [x] Email/password sign-up, login, logout, forgot/reset-password all built and verified against the live project through the real UI (not just API calls) — including error states (invalid email format, rate limiting, wrong credentials)
+- [x] Session persistence via `@react-native-async-storage/async-storage` (native) / supabase-js's own localStorage (web), with `packages/api`'s `createSupabaseClient` made storage-configurable rather than hardcoding a platform
+- [x] Protected routes via Expo Router's `Stack.Protected` guards (signed-in/guest → tabs, signed-out/loading → auth flow, password-recovery → dedicated reset screen) — verified a direct deep-link to a tab route while genuinely signed out still redirects to Welcome, not just the initial app load
+- [x] Guest mode is real now: a persisted local flag (not hardcoded UI), with a working "continue as guest" and "exit guest mode" path, and the sidebar/Settings screen show real signed-in account info instead of a static "Jordan"/"Guest mode" label
+- [x] Google and Apple sign-in wired to `supabase.auth.signInWithOAuth` in code; **not functional yet** — both need OAuth credentials only the user can create. Documented exactly what's needed in `docs/auth-setup.md` rather than shipping dead buttons silently.
+- [x] Minimal Settings screen (modal, reachable via a header avatar tap on Home) with account info + log out / create-account-from-guest — native platforms had no other way to log out before this
+- [x] Found and fixed a real bug from Phase 2's seed script: GoTrue (Supabase Auth) scans several `auth.users` columns (`confirmation_token`, `recovery_token`, etc.) as non-nullable strings — leaving them `NULL` (the column default) breaks with "converting NULL to string is unsupported" on that user's _next_ login. Only surfaced by testing an actual sign-in through the real UI, not by the earlier RLS tests. Fixed both the two live seeded rows and `supabase/seed.sql` itself.
+- [x] Verified: `npm run typecheck`, `npm run lint`, `npm run test` (26/26), `npm run format:check` all pass across all three workspaces; confirmed zero stray test accounts were left in the database after testing
+
+**Known limitations carried forward:** deep-linking directly to a specific tab (e.g. `/plan`) at the exact moment the auth guard is resolving can land on the default Home tab instead — a minor Expo Router state-restoration nuance, not a security issue (the security property — unauthenticated users never see tab content, confirmed by direct deep-link test — holds). Password-reset email click-through could only be verified up to "the email send succeeds"; actually clicking the link needs a real inbox, which is manual QA for the user to do once.
 
 ## Phase 4 — Dashboard, budgeting, paychecks, categories, transactions, core calculations
 
