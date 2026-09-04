@@ -27,7 +27,6 @@ apps/*/android/
 
 # TypeScript build output
 *.tsbuildinfo
-lib/
 build/
 
 # Testing

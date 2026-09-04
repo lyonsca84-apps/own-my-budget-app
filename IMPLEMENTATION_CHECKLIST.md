@@ -21,7 +21,8 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 ## Open items (not blocking current work, need an answer before the phase that needs them)
 
 - [ ] GitHub repo URL — user has a GitHub account, repo status/link not yet confirmed
-- [ ] Supabase organization/project — user has an account; org needs to be created or confirmed in Phase 2
+- [x] Supabase organization/project — org already existed (`lyonsca84-apps's Org`); created a brand-new project ("Own My Budget", `soapkqeaodjawxrvslob`, us-east-2) rather than reusing two unrelated pre-existing projects found in the account
+- [ ] Enable "leaked password protection" in Supabase Auth settings (dashboard toggle, off by default) before Phase 3 ships real sign-up
 - [ ] Final logo, app icon, support email — user will provide later
 - [ ] Domain connection (user owns a domain; exact spelling to confirm before DNS/App Store Connect setup)
 - [ ] Apple Developer Program account — not yet created (needed before iOS TestFlight/App Store submission, not before development)
@@ -69,7 +70,21 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 2 — Supabase schema, migrations, RLS, storage policies, typed data layer
 
-- [ ] Not started
+**Status: Complete**
+
+- [x] Discovered two pre-existing, unrelated Supabase projects in the account with real data in one of them — flagged to the user rather than assumed; created a fresh project per their choice
+- [x] Full normalized schema across 25 tables (see `docs/database.md` for the full list), all with RLS enabled, `updated_at` triggers, and appropriate indexes/foreign keys — 15 migrations in `supabase/migrations/`
+- [x] `entitlements` (plan tier) and `feature_usage` (usage metering) are select-only for the client — no insert/update/delete policy exists for `authenticated`, so only a future service-role webhook/server function can change them. Verified live: a client-side attempt to self-upgrade `plan_tier` is silently rejected by RLS.
+- [x] Household sharing has real membership-based RLS now (via a `private.is_household_member()` helper + auto-owner trigger) even though it's not wired into any UI yet
+- [x] Ran the security & performance advisors after the initial schema and fixed everything they found: a mutable-search-path function, 3 SECURITY DEFINER functions unintentionally exposed as public RPC endpoints (moved to a non-exposed `private` schema), ~30 RLS policies re-evaluating `auth.uid()` per-row instead of once per query, 10 missing FK indexes, and every policy explicitly scoped `to authenticated` instead of left open to all roles
+- [x] Seeded two independent test users (`supabase/seed.sql`) and wrote a repeatable RLS isolation test (`supabase/tests/rls_isolation.sql`) — proves cross-user reads/writes/impersonation all fail, and anonymous access returns nothing. (One real methodology bug caught and fixed along the way: `request.jwt.claims` doesn't get cleared by `SET LOCAL ROLE`, so an early version of the anon check was accidentally still evaluating as the previous authenticated user.)
+- [x] Private storage buckets (`receipts`, `pantry`) with owner-only policies keyed off the `{user_id}/...` path prefix
+- [x] `packages/api` created: generated `Database` types + a typed `createSupabaseClient()` factory + one real query helper (`getCurrentAccount`) — UI code never calls `@supabase/supabase-js` directly
+- [x] `apps/mobile/.env.example` (committed) and `.env` (gitignored, real dev values) added; confirmed `.env` is actually excluded from git
+- [x] End-to-end connectivity verified from a plain Node script against the real project using the publishable key
+- [x] Verified: `npm run typecheck`, `npm run lint`, `npm run test` (26/26), `npm run format:check` all pass across all three workspaces (`core`, `api`, `mobile`)
+
+**Known limitations carried forward:** no local Supabase CLI/Docker stack yet — everything so far runs against the real hosted dev project directly (fine solo, worth revisiting before a second contributor joins). `packages/api`'s query layer only has the one helper needed so far; more get added as each screen in later phases needs them, not spent all at once now.
 
 ## Phase 3 — Authentication, onboarding, profiles, session persistence, protected routes
 

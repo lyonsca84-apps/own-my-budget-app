@@ -6,6 +6,7 @@
   "description": "Own My Budget — Expo Router app shell (iOS + Web for v1). Screens are built phase by phase per PLAN.md, with a preview and approval before each phase.",
   "dependencies": {
     "@expo/ui": "~57.0.16",
+    "@own-my-budget/api": "*",
     "@own-my-budget/core": "*",
     "expo": "~57.0.20",
     "expo-constants": "~57.0.17",
