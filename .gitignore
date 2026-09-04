@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build output
+apps/*/ios/
+apps/*/android/
+*.ipa
+*.apk
+*.aab
+
+# TypeScript build output
+*.tsbuildinfo
+lib/
+build/
+
+# Testing
+coverage/
+
+# Supabase local dev
+supabase/.branches
+supabase/.temp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Design handoff working copies (large binary assets, not shipped)
+design/handoff/**/uploads/
