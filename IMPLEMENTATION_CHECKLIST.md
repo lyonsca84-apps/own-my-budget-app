@@ -123,7 +123,22 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 5 — Bills, reminders, debt tools, savings goals, challenges
 
-- [ ] Not started
+**Status: Complete**
+
+- [x] Scope call: the 52-week challenge is goal creation with an auto-computed target (via `generateChallengeAmounts`) plus the existing deposit/progress flow, not a bespoke 52-square tracker grid — that grid was a lot of UI for limited functional value beyond what progress-tracking already gives. Bill reminders (push/local notifications) are not built — that's Phase 9/notification-infrastructure territory, not core debt/savings/bills math.
+- [x] Debt payoff math added to `packages/core` (`debt.ts`, fully unit-tested): `calculatePayoffSchedule` (snowball and avalanche, with the "snowballing" freed-minimum mechanic, a hard 600-month cap so a payment that can't cover interest can't loop forever) and `calculateCreditUtilization`
+- [x] Savings math added (`savings.ts`, fully unit-tested): `calculateSavingsProgress`, `calculateProjectedCompletionDate`, `generateChallengeAmounts` (classic ascending / flat / reverse / custom)
+- [x] Found and fixed a real, serious bug caught by the new tests: `toISOString().slice(0, 10)` on a locally-constructed date silently shifts a day for any timezone behind UTC — i.e. all of the US, this app's launch region. Root-caused it further to a second, related trap (`new Date('YYYY-MM-DD')` parses as UTC midnight, `new Date(y,m,d)` parses as local midnight — mixing them shifts dates too) and fixed every call site, including one from Phase 4 (`assign-paycheck.tsx`) that had the same latent bug. Added `formatLocalDate`/`parseLocalDate` to `packages/core` as the only sanctioned way to convert between `Date` and the schema's date-only strings.
+- [x] Added two atomic Postgres functions (`record_debt_payment`, `record_goal_activity`) so a payment/deposit and its companion running-balance update (`debts.balance_cents`, `savings_goals.saved_cents`) can never happen only half-way — replaced an initial two-separate-client-calls draft before it shipped, per the master brief's transaction-safety requirement. Regenerated `packages/api`'s database types to include them.
+- [x] Typed data layer extended: debts-with-payments, savings goals, goal activity, savings challenges, bill payments
+- [x] Bills tab rebuilt with real bill list grouped by derived status (needs attention / upcoming / paid), add-bill, and record-payment (partial payments supported)
+- [x] Money tab rebuilt with real debt list (credit utilization shown for cards), add-debt, record-debt-payment, a live snowball-vs-avalanche payoff comparison driven by an editable "extra per month" input, real savings goal list with progress bars, add-goal, and add-deposit/withdrawal (including the 52-week challenge option)
+- [x] Removed a fabricated placeholder from an early draft of the Money tab: a "reach this goal by [date]" projection was going to assume a hardcoded $50/mo contribution for every goal — replaced with nothing rather than a misleading fake number, since there's no real contribution rate to project from yet
+- [x] Verified end-to-end against the live project through the real UI: recorded a partial bill payment and confirmed the remaining balance and status were correct; added a debt with a real 24% APR and confirmed avalanche showed strictly less total interest than snowball once an extra monthly payment was added (the textbook property, reproduced live, not just in the unit tests); added a savings deposit and confirmed via direct DB query that both the activity row and the goal's running total updated atomically
+- [x] Re-verified RLS isolation on every new table/function touched this phase
+- [x] Verified: `npm run typecheck`, `npm run lint`, `npm run test` (71/71), `npm run format:check` all pass across all three workspaces
+
+**Known limitations carried forward:** no bill/payday reminder notifications yet (needs `expo-notifications` + a scheduling strategy — Phase 9 territory). Paycheck-assignment's known Phase 4 limitation (sets rather than accumulates a category's planned amount) still applies. The 52-week challenge tracker is goal progress, not a dedicated week-by-week grid — noted above as a deliberate scope call, not an oversight.
 
 ## Phase 6 — Receipts, groceries, pantry tools, Budget Buddy AI
 

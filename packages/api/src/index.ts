@@ -8,3 +8,5 @@ export * from './queries/paychecks';
 export * from './queries/bills';
 export * from './queries/transactions';
 export * from './queries/budget';
+export * from './queries/debts';
+export * from './queries/savings';

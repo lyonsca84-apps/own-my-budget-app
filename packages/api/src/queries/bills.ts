@@ -32,3 +32,17 @@ export async function createBill(
   if (error) throw error;
   return data;
 }
+
+/**
+ * Unlike debt/goal payments, this is a plain insert with no companion
+ * running-total update — bill status is fully derived (see packages/core's
+ * deriveBillStatus), so there's nothing else to keep in sync.
+ */
+export async function recordBillPayment(
+  client: TypedSupabaseClient,
+  payment: TablesInsert<'bill_payments'>
+): Promise<Tables<'bill_payments'>> {
+  const { data, error } = await client.from('bill_payments').insert(payment).select().single();
+  if (error) throw error;
+  return data;
+}

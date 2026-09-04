@@ -1338,7 +1338,37 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      record_debt_payment: {
+        Args: { p_amount_cents: number; p_debt_id: string; p_paid_on: string };
+        Returns: {
+          amount_cents: number;
+          created_at: string;
+          debt_id: string;
+          id: string;
+          paid_on: string;
+          updated_at: string;
+          user_id: string;
+        };
+      };
+      record_goal_activity: {
+        Args: {
+          p_amount_cents: number;
+          p_goal_id: string;
+          p_kind: string;
+          p_note: string;
+          p_occurred_on: string;
+        };
+        Returns: {
+          amount_cents: number;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;

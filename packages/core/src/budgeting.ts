@@ -1,3 +1,5 @@
+import { parseLocalDate } from './dates';
+
 /**
  * Core budgeting math — pure, deterministic, framework-independent. Every
  * screen that shows a derived number (bill status, money left to spend,
@@ -26,7 +28,9 @@ export function deriveBillStatus(
     return { status: 'paid', remainingCents: 0 };
   }
 
-  const isPastDue = new Date(`${dueDate}T23:59:59`) < today;
+  const dueAtEndOfDay = parseLocalDate(dueDate);
+  dueAtEndOfDay.setHours(23, 59, 59, 999);
+  const isPastDue = dueAtEndOfDay < today;
   return { status: isPastDue ? 'overdue' : 'upcoming', remainingCents };
 }
 

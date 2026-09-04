@@ -10,7 +10,7 @@ import {
   upsertBudgetLine,
   type Tables,
 } from '@own-my-budget/api';
-import { assignPaycheck, formatCents } from '@own-my-budget/core';
+import { assignPaycheck, formatCents, formatLocalDate, parseLocalDate } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -20,12 +20,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Spacing } from '@/constants/theme';
 
-/** First and last day of the calendar month containing `date`, as YYYY-MM-DD. */
+/**
+ * First and last day of the calendar month containing `date`, as YYYY-MM-DD.
+ * Uses formatLocalDate rather than toISOString() — the latter converts to
+ * UTC first, which silently shifts a locally-constructed date back a day in
+ * any US timezone (this app's launch region).
+ */
 function currentMonthBounds(date: Date): { start: string; end: string } {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  return { start: iso(start), end: iso(end) };
+  return { start: formatLocalDate(start), end: formatLocalDate(end) };
 }
 
 export default function AssignPaycheckScreen() {
@@ -72,7 +76,7 @@ export default function AssignPaycheckScreen() {
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      const { start, end } = currentMonthBounds(new Date(paycheck.pay_date));
+      const { start, end } = currentMonthBounds(parseLocalDate(paycheck.pay_date));
       const period = await getOrCreateBudgetPeriod(supabase, user.id, start, end);
       await Promise.all(
         allocations

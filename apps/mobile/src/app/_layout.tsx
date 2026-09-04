@@ -19,6 +19,21 @@ export default function RootLayout() {
   );
 }
 
+/** Every screen pushed on top of the tab shell — all modals with a header. */
+const MODAL_SCREENS: { name: string; title: string }[] = [
+  { name: 'settings', title: 'Settings' },
+  { name: 'add-category', title: 'Add category' },
+  { name: 'add-income', title: 'Add income' },
+  { name: 'add-paycheck', title: 'Log a paycheck' },
+  { name: 'assign-paycheck', title: 'Assign paycheck' },
+  { name: 'add-bill', title: 'Add bill' },
+  { name: 'record-bill-payment', title: 'Record payment' },
+  { name: 'add-debt', title: 'Add debt' },
+  { name: 'record-debt-payment', title: 'Record payment' },
+  { name: 'add-savings-goal', title: 'Add savings goal' },
+  { name: 'add-goal-activity', title: 'Goal activity' },
+];
+
 /**
  * Route protection: signed-in and guest users get the tab shell; everyone
  * else (including the brief moment before the initial session check
@@ -35,23 +50,13 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={status === 'signedIn' || status === 'guest'}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: true }} />
-        <Stack.Screen
-          name="add-category"
-          options={{ presentation: 'modal', headerShown: true, title: 'Add category' }}
-        />
-        <Stack.Screen
-          name="add-income"
-          options={{ presentation: 'modal', headerShown: true, title: 'Add income' }}
-        />
-        <Stack.Screen
-          name="add-paycheck"
-          options={{ presentation: 'modal', headerShown: true, title: 'Log a paycheck' }}
-        />
-        <Stack.Screen
-          name="assign-paycheck"
-          options={{ presentation: 'modal', headerShown: true, title: 'Assign paycheck' }}
-        />
+        {MODAL_SCREENS.map((screen) => (
+          <Stack.Screen
+            key={screen.name}
+            name={screen.name}
+            options={{ presentation: 'modal', headerShown: true, title: screen.title }}
+          />
+        ))}
       </Stack.Protected>
       <Stack.Protected guard={status === 'signedOut' || status === 'loading'}>
         <Stack.Screen name="(auth)" />
