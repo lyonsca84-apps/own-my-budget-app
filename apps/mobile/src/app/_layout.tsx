@@ -36,6 +36,22 @@ function RootNavigator() {
       <Stack.Protected guard={status === 'signedIn' || status === 'guest'}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: true }} />
+        <Stack.Screen
+          name="add-category"
+          options={{ presentation: 'modal', headerShown: true, title: 'Add category' }}
+        />
+        <Stack.Screen
+          name="add-income"
+          options={{ presentation: 'modal', headerShown: true, title: 'Add income' }}
+        />
+        <Stack.Screen
+          name="add-paycheck"
+          options={{ presentation: 'modal', headerShown: true, title: 'Log a paycheck' }}
+        />
+        <Stack.Screen
+          name="assign-paycheck"
+          options={{ presentation: 'modal', headerShown: true, title: 'Assign paycheck' }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={status === 'signedOut' || status === 'loading'}>
         <Stack.Screen name="(auth)" />

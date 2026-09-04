@@ -107,7 +107,19 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 4 — Dashboard, budgeting, paychecks, categories, transactions, core calculations
 
-- [ ] Not started
+**Status: Complete**
+
+- [x] Scope boundary: bill-status derivation moved into `packages/core` now (Home needs it to show real bills), but the full Bills/debt/savings _screens_ stay Phase 5's, matching the phase title split. Real transactions CRUD exists in `packages/api` but has no dedicated screen yet — nothing consumes it until a category-detail or transaction-log screen is built (Phase 5+).
+- [x] Core budgeting math added to `packages/core` (`budgeting.ts`, fully unit-tested): `deriveBillStatus` (with partial-payment handling, due-at-end-of-day), `calculateMoneyLeftToSpend` (line-item breakdown, matches PLAN.md screen #12), `calculatePlannedVsActual`, `calculateBudgetRollover`, `assignPaycheck`, `calculateIncomeTotal`/`calculateExpenseTotal`
+- [x] Found and fixed a real type collision: `demoData.ts` and the new `budgeting.ts` both declared `BillStatus` — consolidated to one canonical definition (`budgeting.ts`), `demoData.ts` now just imports it
+- [x] Typed data-access layer extended in `packages/api`: categories, income sources, paychecks (incl. `markPaycheckAssigned`), bills-with-payments, transactions, budget periods/lines (`getOrCreateBudgetPeriod`, `upsertBudgetLine`) — kept free of any `packages/core` dependency on purpose (data access and pure math stay separate layers; the UI is what combines them)
+- [x] Home dashboard rewired off static demo data for signed-in users via a new `useDashboardData` hook that unifies the guest (demo) and real (Supabase) paths behind one shape — guest mode is untouched, real users see actual balance/bills/money-left-to-spend computed from their own rows, and a genuine empty state (not demo data, not a crash) when they have nothing yet
+- [x] Plan tab rebuilt with real CRUD: income sources, categories, paycheck logging, and a full "assign this paycheck" flow (allocate across categories, validated live against the paycheck total, writes `budget_lines` for the current calendar month and marks the paycheck assigned) — guest mode gets a "create an account" prompt instead of non-functional forms
+- [x] Verified end-to-end against the live project through the real UI, not just API calls: logged in as the seeded test user, added a real income source, a real category, a real paycheck, assigned it across two categories, and confirmed via direct DB query that `budget_periods`/`budget_lines` were created with the exact right amounts ($1,400 + $224 = the full $1,624 paycheck)
+- [x] Re-verified RLS isolation on every new table touched this phase (`budget_lines`, `budget_periods`, `income_sources`, `paychecks`) — the other seeded test user sees zero of this new data
+- [x] Verified: `npm run typecheck`, `npm run lint`, `npm run test` (47/47), `npm run format:check` all pass across all three workspaces
+
+**Known limitations carried forward:** paycheck assignment always _sets_ a category's planned amount for the month rather than adding to it — assigning two paychecks to the same category in one month overwrites rather than accumulates. Fine for v1 (most categories get one paycheck's worth of planning), but worth revisiting once multiple-paychecks-per-month-per-category is a real usage pattern. No date picker — pay dates are typed as `YYYY-MM-DD` text for now.
 
 ## Phase 5 — Bills, reminders, debt tools, savings goals, challenges
 

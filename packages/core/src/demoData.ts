@@ -29,7 +29,10 @@ export interface DemoIncomeSource {
   nextPayDate: string;
 }
 
-export type BillStatus = 'paid' | 'upcoming' | 'overdue';
+// The canonical definition lives in budgeting.ts, exported from the package
+// root via `export * from './budgeting'` — don't redeclare or re-export it
+// here too, or the root index.ts barrel export becomes ambiguous.
+import type { BillStatus } from './budgeting';
 
 export interface DemoBill {
   id: string;

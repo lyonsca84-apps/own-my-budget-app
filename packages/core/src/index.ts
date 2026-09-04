@@ -1,6 +1,7 @@
 export * from './resources';
 export * from './demoData';
 export * from './money';
+export * from './budgeting';
 export * from './featureGate';
 export * from './features/receiptScans';
 export * from './features/pantryScans';
