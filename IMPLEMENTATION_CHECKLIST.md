@@ -53,7 +53,19 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 1 — Application shell, navigation, reusable components, responsive layout, demo data
 
-- [ ] Not started
+**Status: Complete**
+
+- [x] Nav structure decision: PLAN.md's 5 sections (Home · Plan · Bills · Money · Helper) used identically on web and mobile, per PLAN.md §3 — not the design canvas's 6-item sidebar (which added separate Grocery/Reports items). Grocery and Reports are reachable from within Money/Home, not top-level nav.
+- [x] Deterministic demo dataset added to `packages/core` (`demoData.ts`) — 8 bills, 2 credit cards, an auto loan, a mortgage, 2 savings goals, ~2 months of transactions, all integer cents; unit-tested against PLAN.md §2's exact composition
+- [x] `formatCents` money-formatting helper added to `packages/core` (`money.ts`), unit-tested — screens never format money themselves
+- [x] Reusable UI primitives added: `Card`, `Button` (44pt min touch target), `StatusPill` (success/warning/danger/neutral — amber for "watch this," never red, per PLAN.md's never-shame rule), `Avatar`, `EmptyState`
+- [x] Added an `onPrimary` token to the theme (light: white, dark: dark ink) — the dark-mode primary blue is brightened for visibility, which flips which text color has enough contrast on top of it
+- [x] Responsive navigation shell built on `expo-router/ui`'s `Tabs`/`TabList`/`TabTrigger`: native iOS gets Expo's `NativeTabs` (true native tab bar, SF Symbol icons); web gets a single `TabList` whose surrounding chrome switches between a left sidebar (≥900px — logo, nav, Budget Buddy upsell card, guest-mode indicator) and a bottom tab bar (<900px), matching PLAN.md's "same sections, wider layout on web" spec
+- [x] Home screen built with real content from the demo dataset (bank balance, bills left to pay, total saved, total owed, next paycheck, bills needing attention sorted overdue-first)
+- [x] Plan / Bills / Money / Helper screens ship as clearly-labeled "coming in Phase X" placeholders (via a shared `PlaceholderScreen` component) — their real content depends on budgeting math (Phase 4), debt/savings tracking (Phase 5), and the AI integration (Phase 6), so they're honestly deferred rather than half-built
+- [x] Verified: `npm run typecheck`, `npm run lint`, `npm run test` (26/26), `npm run format:check` all pass; manually verified in a web preview at both wide (sidebar) and mobile (375px, bottom tab bar) widths, and in both light and dark color schemes — no console errors, correct active-tab highlighting, correct amber/success/neutral status pill coloring
+
+**Known limitations carried forward:** native iOS tab bar (NativeTabs) hasn't been run on an actual simulator yet — only the web preview has been visually verified this phase. The `expo-router/ui` `<Tabs>` navigator requires `<TabList>` to be a _direct_ child of `<Tabs>` (wrapping it in a custom component breaks screen registration with no useful error until you dig into the console) — documented inline in `app-tabs.web.tsx` for future reference.
 
 ## Phase 2 — Supabase schema, migrations, RLS, storage policies, typed data layer
 

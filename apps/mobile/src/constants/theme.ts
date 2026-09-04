@@ -30,6 +30,7 @@ export const Colors = {
 
     // Brand — blue/teal stays primary across the whole app
     primary: '#0B6FB8',
+    onPrimary: '#FFFFFF',
     primaryMuted: '#D9E7F8',
     accent: '#1598EC',
     accentMuted: '#D7F0EF',
@@ -55,6 +56,10 @@ export const Colors = {
     border: '#1C3A54',
 
     primary: '#4CA6E0',
+    // The dark-mode primary is brightened for visibility on a dark background,
+    // which means white text no longer has enough contrast on top of it —
+    // dark ink reads better here than on the darker light-mode primary.
+    onPrimary: '#00182F',
     primaryMuted: '#123655',
     accent: '#3FCBE0',
     accentMuted: '#0F3A3D',
