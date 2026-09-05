@@ -228,4 +228,16 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 ## Phase 10 — GitHub finalization, staging deployment, production checklist, store submission prep
 
-- [ ] Not started
+**Status: In progress — the blocker-free half is done; GitHub push and any staging deployment are paused pending your input (see below), per the standing rule not to push, publish, or create external resources without approval**
+
+- [x] Investigated GitHub status rather than assuming: no git remote is configured on this local repo, and the `gh` CLI's stored credential for `lyonsca84-apps` is invalid (confirmed via `gh auth status`, not guessed) — so I can't push, and can't even query GitHub read-only, until you either give me an existing repo URL or re-authenticate the CLI yourself (`gh auth refresh -h github.com` or `gh auth login`, needs your own browser/credentials).
+- [x] Investigated Vercel status: your account and team (`lyonsca84-apps' projects`, hobby plan) exist and are reachable, but have zero projects created — nothing there to accidentally disturb. Deploying anything (even "just staging") makes it a public URL, and with no Terms of Service, no Privacy Policy, and Stripe still in test mode, I'm treating that as a real "publish" action requiring your explicit go-ahead first, not something to do by default just because Phase 10 mentions it.
+- [x] Wrote `docs/production-readiness.md` — every open item and known limitation from Phases 0–9, consolidated and re-grouped by what actually blocks real users (accounts, legal, dashboard settings, payments, branding, build tooling) versus what's recommended-but-not-blocking versus what's already verified solid. This needed no external access and is the actual deliverable of "production checklist."
+- [x] Wrote `README.md` (didn't exist before) — stack overview, project structure, local setup steps linking to every `docs/*.md` guide written across Phases 6–8, scripts reference, and a short security-notes section. Makes the repo presentable the moment a GitHub remote exists.
+- [x] Reviewed store-submission-prep items that don't need an Apple Developer account yet: confirmed `ios.bundleIdentifier` is still the known placeholder (flagged since Phase 0, now cross-referenced in `docs/production-readiness.md` instead of only living in this file), confirmed app icon assets are still the unmodified Expo template default (matches what you told me back in the original Q&A — not a new finding, just re-verified against the actual files on disk), confirmed `eas.json` doesn't exist yet (expected — no native build has been attempted).
+
+**Blocked on you, not attempted without asking:**
+
+- Push to GitHub — need either an existing repo URL, or explicit permission plus a repo name to create a new one (your `gh` CLI needs re-authenticating first either way).
+- Any Vercel deployment, staging or otherwise — explicit go-ahead needed given the public-exposure/no-legal-docs situation above.
+- Everything in `docs/production-readiness.md`'s "Launch blockers" section that only you can do (new accounts, legal review, dashboard toggles, final branding assets).
