@@ -1,24 +1,16 @@
 # AI (Budget Buddy, receipts, pantry scans) setup
 
-## What already works (verified against the live project)
+## Status: fully working, verified live
 
-Three Supabase Edge Functions are deployed and live against the real project (`soapkqeaodjawxrvslob`): `receipt-scan`, `pantry-scan`, `budget-buddy-chat`. All three verify the caller's session server-side, enforce `packages/core`'s `FEATURE_REGISTRY` usage limits before spending any tokens, and record usage only after a successful Claude response. This has been tested end-to-end against the live database: authentication rejection (401), usage-limit rejection (403, verified by temporarily setting a test user's usage to their plan's limit), and the request path all the way up to the Anthropic API call. The one thing that **cannot** work yet is the Anthropic API call itself — that needs the secret below.
+Three Supabase Edge Functions are deployed and live against the real project (`soapkqeaodjawxrvslob`): `receipt-scan`, `pantry-scan`, `budget-buddy-chat`. All three verify the caller's session server-side, enforce `packages/core`'s `FEATURE_REGISTRY` usage limits before spending any tokens, and record usage only after a successful Claude response. `ANTHROPIC_API_KEY` is set as an Edge Function secret and Anthropic billing is active — confirmed by real, live requests returning real Claude responses for all three functions (not just reaching the code, an actual model response), with `feature_usage` incrementing correctly and being cleaned up after each test.
 
-## Required: `ANTHROPIC_API_KEY`
+## `ANTHROPIC_API_KEY`
 
-Every AI feature (Budget Buddy chat, receipt scanning, pantry scanning) calls Claude from inside these Edge Functions — never from the client, per the project's security rules. Until this secret is set, every AI request fails with a generic 500 ("Something went wrong…") after passing auth and usage checks — that's the expected, safe failure mode, not a bug.
+Every AI feature (Budget Buddy chat, receipt scanning, pantry scanning) calls Claude from inside these Edge Functions — never from the client, per the project's security rules. If this secret is ever unset or the underlying Anthropic account runs out of credits, every AI request fails with a generic 500 ("Something went wrong…") after passing auth and usage checks — that's the expected, safe failure mode, not a bug, and the two most likely causes if it ever recurs.
 
-Set it yourself; **never paste an API key into chat with an AI assistant**, including this one:
+Set it via the Supabase dashboard (Project Settings → Edge Functions → Secrets) or the CLI (`supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref soapkqeaodjawxrvslob`) — never paste an API key into chat with an AI assistant, including this one. No redeploy is needed after setting it — Edge Functions read secrets from the environment at request time.
 
-**Option A — Supabase dashboard:** Project Settings → Edge Functions → Secrets → add `ANTHROPIC_API_KEY`.
-
-**Option B — Supabase CLI** (if installed locally):
-
-```bash
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref soapkqeaodjawxrvslob
-```
-
-No redeploy is needed after setting it — Edge Functions read secrets from the environment at request time.
+**If a request ever fails again:** check first whether it's the key (unset/revoked) or Anthropic account billing (out of credits) — those are the two failure modes actually seen during this project's setup, both surfacing as the same generic 500 from the client's perspective.
 
 ## Models (centralized in `supabase/functions/_shared/ai-config.ts`)
 
