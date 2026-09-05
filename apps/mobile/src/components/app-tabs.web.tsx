@@ -119,6 +119,8 @@ function AccountSummary() {
   const isGuest = status === 'guest';
   const name = isGuest ? 'Guest mode' : (user?.email?.split('@')[0] ?? 'Account');
 
+  const actionDescription = isGuest ? 'Demo data — tap to create an account' : 'Tap to log out';
+
   return (
     <Pressable
       onPress={() => {
@@ -130,6 +132,9 @@ function AccountSummary() {
           signOut();
         }
       }}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`${name}. ${actionDescription}`}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -144,7 +149,7 @@ function AccountSummary() {
           {name}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {isGuest ? 'Demo data — tap to create an account' : 'Tap to log out'}
+          {actionDescription}
         </ThemedText>
       </View>
     </Pressable>
@@ -185,6 +190,9 @@ function NavButton({
     return (
       <Pressable
         {...(props as ComponentProps<typeof Pressable>)}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: isFocused }}
+        accessibilityLabel={label}
         style={{
           borderRadius: Spacing.three,
           paddingVertical: Spacing.two,
@@ -206,6 +214,9 @@ function NavButton({
   return (
     <Pressable
       {...(props as ComponentProps<typeof Pressable>)}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isFocused }}
+      accessibilityLabel={label}
       style={{
         alignItems: 'center',
         gap: 2,

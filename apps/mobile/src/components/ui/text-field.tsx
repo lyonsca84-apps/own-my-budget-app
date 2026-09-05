@@ -16,6 +16,7 @@ export function TextField({ label, errorMessage, style, ...props }: TextFieldPro
     <View style={{ gap: Spacing.one }}>
       <ThemedText type="smallBold">{label}</ThemedText>
       <TextInput
+        accessibilityLabel={errorMessage ? `${label}. ${errorMessage}` : label}
         placeholderTextColor={theme.textSecondary}
         style={[
           {
