@@ -1,4 +1,5 @@
 export * from './resources';
+export * from './reports';
 export * from './demoData';
 export * from './money';
 export * from './budgeting';

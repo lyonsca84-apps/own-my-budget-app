@@ -37,6 +37,16 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'scan-pantry', title: 'Scan pantry' },
   { name: 'review-pantry', title: 'Review pantry scan' },
   { name: 'grocery-list', title: 'Grocery list' },
+  { name: 'reports', title: 'Reports' },
+  { name: 'report-spending', title: 'Spending by category' },
+  { name: 'report-income-expenses', title: 'Income vs. expenses' },
+  { name: 'report-debt-savings', title: 'Debt & savings progress' },
+  { name: 'export-data', title: 'Export your data' },
+  { name: 'notification-settings', title: 'Notifications' },
+  { name: 'manage-categories', title: 'Manage categories' },
+  { name: 'security', title: 'Security' },
+  { name: 'data-privacy', title: 'Data & privacy' },
+  { name: 'help-legal', title: 'Help, FAQ & legal' },
 ];
 
 /**

@@ -15,13 +15,13 @@ export class EdgeFunctionError extends Error {
 }
 
 /**
- * Every AI Edge Function returns a JSON body of either `{ ...result }` on
- * success or `{ error: string, code?: string }` on failure (see
- * supabase/functions/_shared/cors.ts's jsonResponse + each function's catch
- * block). This unwraps that convention once, so each wrapper below is just
- * "what shape does this specific function return."
+ * Every Edge Function in this project returns a JSON body of either
+ * `{ ...result }` on success or `{ error: string, code?: string }` on
+ * failure (see supabase/functions/_shared/cors.ts's jsonResponse + each
+ * function's catch block). This unwraps that convention once, so each
+ * wrapper below is just "what shape does this specific function return."
  */
-async function invokeAiFunction<T>(
+async function invokeEdgeFunction<T>(
   client: TypedSupabaseClient,
   name: string,
   body: Record<string, unknown>
@@ -73,7 +73,7 @@ export async function scanReceipt(
   imageBase64: string,
   mediaType: string
 ): Promise<ReceiptExtraction> {
-  const { extraction } = await invokeAiFunction<{ extraction: ReceiptExtraction }>(
+  const { extraction } = await invokeEdgeFunction<{ extraction: ReceiptExtraction }>(
     client,
     'receipt-scan',
     { imageBase64, mediaType }
@@ -91,7 +91,7 @@ export async function scanPantry(
   imageBase64: string,
   mediaType: string
 ): Promise<PantryExtraction> {
-  const { extraction } = await invokeAiFunction<{ extraction: PantryExtraction }>(
+  const { extraction } = await invokeEdgeFunction<{ extraction: PantryExtraction }>(
     client,
     'pantry-scan',
     { imageBase64, mediaType }
@@ -109,9 +109,18 @@ export async function sendBudgetBuddyMessage(
   message: string,
   history: BudgetBuddyHistoryMessage[]
 ): Promise<string> {
-  const { reply } = await invokeAiFunction<{ reply: string }>(client, 'budget-buddy-chat', {
+  const { reply } = await invokeEdgeFunction<{ reply: string }>(client, 'budget-buddy-chat', {
     message,
     history,
   });
   return reply;
+}
+
+/**
+ * Deletes the caller's own account and every row that depends on it —
+ * irreversible. The caller (UI) is responsible for getting explicit
+ * confirmation before invoking this; nothing here prompts.
+ */
+export async function deleteAccount(client: TypedSupabaseClient): Promise<void> {
+  await invokeEdgeFunction<{ deleted: true }>(client, 'delete-account', {});
 }

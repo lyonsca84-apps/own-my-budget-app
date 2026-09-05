@@ -14,3 +14,5 @@ export * from './queries/feature-usage';
 export * from './queries/edge-functions';
 export * from './queries/receipts';
 export * from './queries/groceries';
+export * from './queries/reports';
+export * from './queries/notification-preferences';

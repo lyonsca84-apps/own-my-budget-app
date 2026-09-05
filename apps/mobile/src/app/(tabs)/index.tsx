@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatCents, type BillStatus } from '@own-my-budget/core';
@@ -11,6 +12,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusPill, type StatusTone } from '@/components/ui/status-pill';
 import { useAuth } from '@/contexts/auth-context';
 import { useDashboardData } from '@/hooks/use-dashboard-data';
+import { supabase } from '@/lib/supabase';
+import { rescheduleAllNotifications } from '@/lib/notifications';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 const BILL_STATUS_TONE: Record<BillStatus, StatusTone> = {
@@ -29,6 +32,14 @@ export default function HomeScreen() {
   const { status, user } = useAuth();
   const data = useDashboardData();
   const avatarName = status === 'signedIn' ? (user?.email ?? data.displayName) : data.displayName;
+
+  useEffect(() => {
+    if (status !== 'signedIn' || !user) return;
+    // Keeps scheduled bill/payday reminders in sync with current data.
+    // Best-effort: a failure here (permission denied, etc.) must never
+    // break the Home screen itself.
+    rescheduleAllNotifications(supabase, user.id).catch(() => {});
+  }, [status, user]);
 
   return (
     <ThemedView style={{ flex: 1 }}>

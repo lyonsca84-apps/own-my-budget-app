@@ -10,13 +10,16 @@ import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
+import { notifyGoalMilestoneIfCrossed } from '@/lib/notifications';
 
 export default function AddGoalActivityScreen() {
   const { goalId, kind } = useLocalSearchParams<{
     goalId: string;
     kind: 'deposit' | 'withdrawal';
   }>();
+  const { user } = useAuth();
   const isWithdrawal = kind === 'withdrawal';
   const [amount, setAmount] = useState('');
   const [occurredOn, setOccurredOn] = useState(formatLocalDate(new Date()));
@@ -33,12 +36,37 @@ export default function AddGoalActivityScreen() {
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
+      const goalBefore = isWithdrawal
+        ? null
+        : await supabase
+            .from('savings_goals')
+            .select('label, saved_cents, target_cents')
+            .eq('id', goalId)
+            .single();
+
       await recordGoalActivity(supabase, {
         goalId,
         amountCents,
         kind: isWithdrawal ? 'withdrawal' : 'deposit',
         occurredOn,
       });
+
+      if (goalBefore?.data && user) {
+        // The deposit already succeeded above — a failure here (e.g. a
+        // notification-permission hiccup) must never surface as an error
+        // for an already-successful save.
+        try {
+          await notifyGoalMilestoneIfCrossed(supabase, user.id, {
+            goalLabel: goalBefore.data.label,
+            previousSavedCents: goalBefore.data.saved_cents,
+            newSavedCents: goalBefore.data.saved_cents + amountCents,
+            targetCents: goalBefore.data.target_cents,
+          });
+        } catch {
+          // Ignore — the deposit itself is what matters.
+        }
+      }
+
       router.back();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong.');
