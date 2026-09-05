@@ -67,6 +67,24 @@ export interface FeatureDefinition {
   limits: Record<PlanTier, FeatureLimit>;
 }
 
+/**
+ * The `feature_usage.period_start` value for a given limit period, computed
+ * the same way the AI Edge Functions compute it server-side (see
+ * supabase/functions/_shared/usage.ts) — UTC calendar month, not local. This
+ * is the one deliberate exception to the app's "always use local dates"
+ * rule: the server has no local timezone to anchor to, so the client must
+ * match its UTC bucketing exactly, or a usage query near a month boundary
+ * could read the wrong row.
+ */
+export function getUsagePeriodStart(
+  period: 'monthly' | 'lifetime',
+  now: Date = new Date()
+): string {
+  if (period === 'lifetime') return '1970-01-01';
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${now.getUTCFullYear()}-${month}-01`;
+}
+
 export const FEATURE_REGISTRY: Record<FeatureKey, FeatureDefinition> = {
   receiptScan: {
     label: 'Receipt scans',

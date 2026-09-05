@@ -33,7 +33,7 @@ Hourly workers, fixed incomes, retirees, single parents, families, anyone living
 | Shared logic  | **`packages/core`** — pure TypeScript                                    | Budget math, payoff schedules, rollover rules live here. Zero UI dependencies, fully unit-testable.                  |
 | Local data    | **SQLite (expo-sqlite) / IndexedDB on web**                              | Local-first. App is fully usable offline and in guest mode with no account.                                          |
 | Backend       | **Supabase** (Postgres + Auth + Storage + Row Level Security)            | Handles sync, auth, and receipt image storage. Generous free tier. RLS means one user can never read another's rows. |
-| AI            | **Claude API (`claude-opus-5`)** via a server function                   | Receipt extraction, pantry scans, Budget Helper, Missions. Key never touches the device.                             |
+| AI            | **Claude API** via server-side Supabase Edge Functions                   | Receipt extraction, pantry scans, Budget Helper. Key never touches the device. Per-feature model choice, see below.  |
 | Notifications | **expo-notifications, scheduled locally**                                | Bill reminders fire offline, no server needed.                                                                       |
 | Payments      | **RevenueCat** (App Store + Stripe for web) — **stubbed during testing** | Entitlements are a feature flag until you're ready to charge.                                                        |
 
@@ -44,9 +44,13 @@ Hourly workers, fixed incomes, retirees, single parents, families, anyone living
 
 ### AI specifics
 
-- **Receipt & pantry extraction:** `claude-opus-5` with image input, returning a strict JSON schema (`output_config.format`) so the app always gets parseable line items. The user reviews and corrects everything before it saves — the AI never writes to the budget directly.
-- **Budget Helper & Missions:** same model, streaming responses, with a system prompt that enforces the non-judgmental tone and hard-blocks investment/tax/legal advice, redirecting to the disclaimer.
-- **Cost control:** free tier gets 2 photo scans and 2 missions total; usage is metered server-side so it can't be bypassed.
+Model IDs verified against current Anthropic API docs in Phase 6 (not the same models named when this plan was first drafted) and centralized in `supabase/functions/_shared/ai-config.ts` — nothing else in the codebase hardcodes a model string.
+
+- **Receipt extraction:** `claude-sonnet-5` with image input, a forced tool call with a strict JSON schema so the app always gets parseable line items. The user reviews and corrects everything before it saves (screen #45) — the AI never writes to the budget directly.
+- **Pantry scan:** `claude-haiku-4-5` — lower-stakes suggestion list, cheaper model, same never-auto-saves rule.
+- **Budget Helper (Budget Buddy):** `claude-sonnet-5`, with a system prompt that enforces the non-judgmental tone and hard-blocks investment/tax/legal advice, redirecting to a licensed professional instead. Chat history is not persisted (client-side state only), which is also how "delete my chat history" is satisfied.
+- **Missions:** not yet built (deferred out of Phase 6 — see `IMPLEMENTATION_CHECKLIST.md`'s Phase 6 section); doesn't need AI to begin with.
+- **Cost control:** every AI action is checked against `packages/core`'s `FEATURE_REGISTRY` limits server-side _before_ the Claude call runs, so an over-limit request never reaches (or costs) the API — verified live, not just in theory.
 
 ### Testing without real money
 

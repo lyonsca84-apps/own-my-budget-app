@@ -32,6 +32,11 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'record-debt-payment', title: 'Record payment' },
   { name: 'add-savings-goal', title: 'Add savings goal' },
   { name: 'add-goal-activity', title: 'Goal activity' },
+  { name: 'scan-receipt', title: 'Scan receipt' },
+  { name: 'review-receipt', title: 'Review receipt' },
+  { name: 'scan-pantry', title: 'Scan pantry' },
+  { name: 'review-pantry', title: 'Review pantry scan' },
+  { name: 'grocery-list', title: 'Grocery list' },
 ];
 
 /**

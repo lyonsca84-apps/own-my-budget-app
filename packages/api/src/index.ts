@@ -10,3 +10,7 @@ export * from './queries/transactions';
 export * from './queries/budget';
 export * from './queries/debts';
 export * from './queries/savings';
+export * from './queries/feature-usage';
+export * from './queries/edge-functions';
+export * from './queries/receipts';
+export * from './queries/groceries';

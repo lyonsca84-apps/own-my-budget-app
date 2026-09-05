@@ -25,6 +25,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Own My Budget uses your photos to scan receipts and pantry items.",
+          "cameraPermission": "Own My Budget uses your camera to scan receipts and pantry items."
+        }
       ]
     ],
     "experiments": {
