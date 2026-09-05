@@ -124,3 +124,31 @@ export async function sendBudgetBuddyMessage(
 export async function deleteAccount(client: TypedSupabaseClient): Promise<void> {
   await invokeEdgeFunction<{ deleted: true }>(client, 'delete-account', {});
 }
+
+/**
+ * Returns a Stripe Checkout URL to redirect the browser to. The client
+ * names a plan tier + billing interval, never a raw Stripe Price ID —
+ * those live only in server-side config (see
+ * supabase/functions/_shared/stripe-config.ts).
+ */
+export async function createCheckoutSession(
+  client: TypedSupabaseClient,
+  args: {
+    plan: 'guided' | 'budgetBuddy';
+    interval: 'monthly' | 'yearly';
+    successUrl: string;
+    cancelUrl: string;
+  }
+): Promise<string> {
+  const { url } = await invokeEdgeFunction<{ url: string }>(client, 'stripe-checkout', args);
+  return url;
+}
+
+/** Returns a Stripe Billing Portal URL to redirect the browser to. */
+export async function createPortalSession(
+  client: TypedSupabaseClient,
+  returnUrl: string
+): Promise<string> {
+  const { url } = await invokeEdgeFunction<{ url: string }>(client, 'stripe-portal', { returnUrl });
+  return url;
+}

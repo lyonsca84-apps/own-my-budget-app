@@ -47,6 +47,11 @@ export default function SettingsScreen() {
             <>
               <View style={{ gap: Spacing.two }}>
                 <Button
+                  label="Subscription & plan"
+                  variant="secondary"
+                  onPress={() => router.push('/subscription')}
+                />
+                <Button
                   label="Reports"
                   variant="secondary"
                   onPress={() => router.push('/reports')}

@@ -34,6 +34,23 @@ export const NEXT_TIER: Record<PlanTier, PlanTier | null> = {
   budgetBuddy: null,
 };
 
+export type PaidPlanTier = Exclude<PlanTier, 'free'>;
+
+/**
+ * Display pricing for the paywall — dollars, not cents, since these are
+ * never used in money math (see money.ts's integer-cents rule for that),
+ * only shown as text. Kept here alongside TIER_LABELS as the one source of
+ * truth for "what does this plan cost," matching the confirmed pricing
+ * documented above.
+ */
+export const PLAN_PRICING: Record<
+  PaidPlanTier,
+  { monthly: string; yearly: string; trialDays?: number }
+> = {
+  guided: { monthly: '$5.99', yearly: '$49.99' },
+  budgetBuddy: { monthly: '$9.99', yearly: '$79.99', trialDays: 14 },
+};
+
 export type FeatureKey =
   | 'receiptScan'
   | 'pantryScan'

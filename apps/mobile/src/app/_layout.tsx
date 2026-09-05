@@ -47,6 +47,8 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'security', title: 'Security' },
   { name: 'data-privacy', title: 'Data & privacy' },
   { name: 'help-legal', title: 'Help, FAQ & legal' },
+  { name: 'subscription', title: 'Subscription & plan' },
+  { name: 'paywall', title: 'Choose your plan' },
 ];
 
 /**
