@@ -2,6 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "build": {
     "env": {
       "EXPO_PUBLIC_SUPABASE_URL": "https://soapkqeaodjawxrvslob.supabase.co",
