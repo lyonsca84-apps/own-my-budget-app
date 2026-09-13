@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "build": {
+    "env": {
+      "EXPO_PUBLIC_SUPABASE_URL": "https://soapkqeaodjawxrvslob.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_1w9wKAwMQoy47VhMzBAYDg_rNZBzbq7"
+    }
+  }
+}
