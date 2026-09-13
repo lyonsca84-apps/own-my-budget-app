@@ -8,10 +8,23 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 
 const GUEST_MODE_KEY = 'own-my-budget:guest-mode';
+
+/**
+ * Without an explicit redirectTo, GoTrue sends the browser back to the
+ * project's Site URL — a single dashboard setting that can't track every
+ * host this app is served from. Passing the page's own origin here keeps
+ * the redirect correct regardless of what Site URL happens to be set to,
+ * as long as that origin is also in Supabase's Redirect URLs allowlist.
+ * Native has no window/URL to redirect through, so it's left unset there.
+ */
+function oauthRedirectOptions() {
+  return Platform.OS === 'web' ? { redirectTo: window.location.origin } : undefined;
+}
 
 export type AuthStatus = 'loading' | 'signedOut' | 'guest' | 'signedIn' | 'passwordRecovery';
 
@@ -100,12 +113,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
 
       async signInWithGoogle() {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: oauthRedirectOptions(),
+        });
         return { error: error?.message ?? null };
       },
 
       async signInWithApple() {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'apple',
+          options: oauthRedirectOptions(),
+        });
         return { error: error?.message ?? null };
       },
 
