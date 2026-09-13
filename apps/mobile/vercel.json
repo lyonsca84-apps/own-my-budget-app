@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npx expo export -p web",
+  "outputDirectory": "dist",
+  "env": {
+    "EXPO_PUBLIC_SUPABASE_URL": "https://soapkqeaodjawxrvslob.supabase.co",
+    "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_1w9wKAwMQoy47VhMzBAYDg_rNZBzbq7"
+  }
+}
