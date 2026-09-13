@@ -1,16 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function SignInScreen() {
+  const theme = useTheme();
   const { signIn, signInWithGoogle, signInWithApple } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,65 +34,117 @@ export default function SignInScreen() {
     <ThemedView style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <View
-          style={{ flex: 1, justifyContent: 'center', padding: Spacing.five, gap: Spacing.four }}
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: Spacing.four,
+          }}
         >
-          <ThemedText type="title" style={{ fontSize: 24 }}>
-            Welcome back
-          </ThemedText>
-
-          <View style={{ gap: Spacing.three }}>
-            <TextField
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-            <TextField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="current-password"
-              textContentType="password"
-            />
-            {errorMessage ? (
-              <ThemedText type="small" themeColor="danger">
-                {errorMessage}
+          <Card style={{ width: '100%', maxWidth: 400, gap: Spacing.four }}>
+            <View style={{ alignItems: 'center', gap: Spacing.one }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: Spacing.four,
+                  backgroundColor: theme.primaryMuted,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: Spacing.two,
+                }}
+              >
+                <ThemedText
+                  type="title"
+                  themeColor="primary"
+                  style={{ fontSize: 24, lineHeight: 28 }}
+                >
+                  $
+                </ThemedText>
+              </View>
+              <ThemedText type="subtitle" style={{ fontSize: 22, lineHeight: 28 }}>
+                Welcome back
               </ThemedText>
-            ) : null}
-            <Button
-              label={isSubmitting ? 'Logging in…' : 'Log in'}
-              onPress={handleSignIn}
-              disabled={isSubmitting || !email || !password}
-            />
-            <Button
-              label="Forgot password?"
-              variant="secondary"
-              onPress={() => router.push('/forgot-password')}
-            />
-          </View>
+              <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+                Log in to keep your budget on track.
+              </ThemedText>
+            </View>
 
-          <View style={{ gap: Spacing.two }}>
-            <Button
-              label="Continue with Google"
-              variant="secondary"
-              onPress={() => signInWithGoogle()}
-            />
-            <Button
-              label="Continue with Apple"
-              variant="secondary"
-              onPress={() => signInWithApple()}
-            />
-          </View>
+            <View style={{ gap: Spacing.three }}>
+              <TextField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+              />
+              <TextField
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="current-password"
+                textContentType="password"
+              />
 
-          <Button
-            label="New here? Create an account"
-            variant="secondary"
-            onPress={() => router.replace('/sign-up')}
-          />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push('/forgot-password')}
+                  hitSlop={8}
+                >
+                  <ThemedText type="link" themeColor="primary">
+                    Forgot password?
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {errorMessage ? (
+                <ThemedText type="small" themeColor="danger">
+                  {errorMessage}
+                </ThemedText>
+              ) : null}
+
+              <Button
+                label={isSubmitting ? 'Logging in…' : 'Log in'}
+                onPress={handleSignIn}
+                disabled={isSubmitting || !email || !password}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+              <ThemedText type="small" themeColor="textSecondary">
+                Or continue with
+              </ThemedText>
+              <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Google" variant="secondary" onPress={() => signInWithGoogle()} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button label="Apple" variant="secondary" onPress={() => signInWithApple()} />
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.replace('/sign-up')}
+              style={{ alignItems: 'center' }}
+              hitSlop={8}
+            >
+              <ThemedText type="small" themeColor="textSecondary">
+                New here?{' '}
+                <ThemedText type="smallBold" themeColor="primary">
+                  Create an account
+                </ThemedText>
+              </ThemedText>
+            </Pressable>
+          </Card>
         </View>
       </SafeAreaView>
     </ThemedView>
