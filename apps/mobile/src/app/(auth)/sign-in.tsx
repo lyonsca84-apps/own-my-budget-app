@@ -5,8 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
+import { Button, IconButton } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { AppleLogo, GoogleLogo } from '@/components/ui/social-icons';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { Spacing } from '@/constants/theme';
@@ -122,13 +123,19 @@ export default function SignInScreen() {
               <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
             </View>
 
-            <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-              <View style={{ flex: 1 }}>
-                <Button label="Google" variant="secondary" onPress={() => signInWithGoogle()} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button label="Apple" variant="secondary" onPress={() => signInWithApple()} />
-              </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.three }}>
+              <IconButton
+                accessibilityLabel="Continue with Google"
+                onPress={() => signInWithGoogle()}
+              >
+                <GoogleLogo />
+              </IconButton>
+              <IconButton
+                accessibilityLabel="Continue with Apple"
+                onPress={() => signInWithApple()}
+              >
+                <AppleLogo color={theme.text} />
+              </IconButton>
             </View>
 
             <Pressable

@@ -5,13 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
+import { Button, IconButton } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { AppleLogo, GoogleLogo } from '@/components/ui/social-icons';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function SignUpScreen() {
+  const theme = useTheme();
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -94,17 +97,16 @@ export default function SignUpScreen() {
             />
           </View>
 
-          <View style={{ gap: Spacing.two }}>
-            <Button
-              label="Continue with Google"
-              variant="secondary"
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.three }}>
+            <IconButton
+              accessibilityLabel="Continue with Google"
               onPress={() => signInWithGoogle()}
-            />
-            <Button
-              label="Continue with Apple"
-              variant="secondary"
-              onPress={() => signInWithApple()}
-            />
+            >
+              <GoogleLogo />
+            </IconButton>
+            <IconButton accessibilityLabel="Continue with Apple" onPress={() => signInWithApple()}>
+              <AppleLogo color={theme.text} />
+            </IconButton>
           </View>
 
           <Button

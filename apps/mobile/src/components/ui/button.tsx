@@ -12,6 +12,35 @@ export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> 
 /** 44pt minimum tap target per PLAN.md's accessibility rules — never make this shorter. */
 const MIN_TOUCH_TARGET = 44;
 
+export interface IconButtonProps extends Omit<PressableProps, 'style'> {
+  accessibilityLabel: string;
+}
+
+/** Square, bordered icon-only button — same touch target and border treatment as the secondary Button. */
+export function IconButton({ children, accessibilityLabel, ...props }: IconButtonProps) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => ({
+        minHeight: MIN_TOUCH_TARGET,
+        minWidth: MIN_TOUCH_TARGET,
+        borderRadius: Spacing.three,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: theme.border,
+        opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1,
+      })}
+      {...props}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 export function Button({ label, variant = 'primary', ...props }: ButtonProps) {
   const theme = useTheme();
   const isPrimary = variant === 'primary';
