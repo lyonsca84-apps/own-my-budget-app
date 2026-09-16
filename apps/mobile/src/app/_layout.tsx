@@ -62,6 +62,7 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'review-pantry', title: 'Review pantry scan' },
   { name: 'grocery-list', title: 'Grocery list' },
   { name: 'reports', title: 'Reports' },
+  { name: 'helper', title: 'Budget Buddy' },
   { name: 'report-spending', title: 'Spending by category' },
   { name: 'report-income-expenses', title: 'Income vs. expenses' },
   { name: 'report-debt-savings', title: 'Debt & savings progress' },

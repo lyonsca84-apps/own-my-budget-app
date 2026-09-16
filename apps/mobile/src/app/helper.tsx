@@ -112,20 +112,18 @@ export default function HelperScreen() {
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: Spacing.four,
-              paddingBottom: 0,
-            }}
-          >
-            <ThemedText type="subtitle">Budget Buddy</ThemedText>
-            {messages.length > 0 ? (
+          {messages.length > 0 ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                padding: Spacing.four,
+                paddingBottom: 0,
+              }}
+            >
               <Button label="Clear chat" variant="secondary" onPress={handleClearChat} />
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
           <View
             style={{
