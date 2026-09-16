@@ -1,4 +1,5 @@
 export * from './resources';
+export * from './budgetHealth';
 export * from './reports';
 export * from './demoData';
 export * from './money';
