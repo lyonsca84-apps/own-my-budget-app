@@ -1,12 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { createIncomeSource, type Database } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -50,61 +49,54 @@ export default function AddIncomeScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Add income source
-          </ThemedText>
+    <Screen>
+      <TextField
+        label="Source"
+        value={label}
+        onChangeText={setLabel}
+        placeholder="e.g. Riverside Retail"
+      />
+      <TextField
+        label="Amount per paycheck"
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="0.00"
+        keyboardType="decimal-pad"
+      />
 
-          <TextField
-            label="Source"
-            value={label}
-            onChangeText={setLabel}
-            placeholder="e.g. Riverside Retail"
-          />
-          <TextField
-            label="Amount per paycheck"
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-
-          <View style={{ gap: Spacing.one }}>
-            <ThemedText type="smallBold">Frequency</ThemedText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-              {FREQUENCIES.map((option) => (
-                <Button
-                  key={option}
-                  label={option.replace('_', ' ')}
-                  variant={option === frequency ? 'primary' : 'secondary'}
-                  onPress={() => setFrequency(option)}
-                />
-              ))}
-            </View>
-          </View>
-
-          <TextField
-            label="Next pay date (optional)"
-            value={nextPayDate}
-            onChangeText={setNextPayDate}
-            placeholder="YYYY-MM-DD"
-          />
-
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save income source'}
-            onPress={handleSave}
-            disabled={isSubmitting || !label.trim() || !amount.trim()}
-          />
+      <View style={{ gap: Spacing.one }}>
+        <ThemedText type="smallBold">Frequency</ThemedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
+          {FREQUENCIES.map((option) => (
+            <Button
+              key={option}
+              label={option.replace('_', ' ')}
+              variant={option === frequency ? 'primary' : 'secondary'}
+              onPress={() => setFrequency(option)}
+            />
+          ))}
         </View>
-      </SafeAreaView>
-    </ThemedView>
+      </View>
+
+      <TextField
+        label="Next pay date (optional)"
+        value={nextPayDate}
+        onChangeText={setNextPayDate}
+        placeholder="YYYY-MM-DD"
+      />
+
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
+
+      <Button
+        variant="panel"
+        label={isSubmitting ? 'Saving…' : 'Save income source'}
+        onPress={handleSave}
+        disabled={isSubmitting || !label.trim() || !amount.trim()}
+      />
+    </Screen>
   );
 }

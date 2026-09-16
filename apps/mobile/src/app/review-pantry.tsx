@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { addGroceryItems, getOrCreateDefaultGroceryList } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusPill } from '@/components/ui/status-pill';
+import { SubsectionHeader } from '@/components/ui/subsection-header';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { scanHandoff } from '@/lib/scan-handoff';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 interface CheckableItem {
   label: string;
@@ -58,56 +60,62 @@ export default function ReviewPantryScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            What we saw
-          </ThemedText>
-
-          {wellStocked.length > 0 ? (
-            <Card style={{ gap: Spacing.one }}>
-              <ThemedText type="smallBold">Looks well stocked</ThemedText>
-              <ThemedText themeColor="textSecondary">{wellStocked.join(', ')}</ThemedText>
-            </Card>
-          ) : null}
-
-          <ThemedText type="smallBold">Running low or missing — pick what to add</ThemedText>
-          {candidates.length === 0 ? (
-            <ThemedText themeColor="textSecondary">Nothing stood out as low or missing.</ThemedText>
-          ) : (
-            candidates.map((item, index) => (
-              <Card
-                key={index}
+    <Screen>
+      {wellStocked.length > 0 ? (
+        <SectionCard title="Looks well stocked">
+          <View style={{ gap: Space[3] }}>
+            {wellStocked.map((label) => (
+              <View
+                key={label}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: Space[3],
                 }}
               >
-                <ThemedText>{item.label}</ThemedText>
-                <Button
-                  label={item.checked ? 'Added' : 'Add'}
-                  variant={item.checked ? 'primary' : 'secondary'}
-                  onPress={() => toggle(index)}
-                />
-              </Card>
-            ))
-          )}
+                <ThemedText style={{ flex: 1 }}>{label}</ThemedText>
+                <StatusPill label="In stock" tone="success" />
+              </View>
+            ))}
+          </View>
+        </SectionCard>
+      ) : null}
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+      <SubsectionHeader title="Running low or missing — pick what to add" />
+      {candidates.length === 0 ? (
+        <ThemedText themeColor="textSecondary">Nothing stood out as low or missing.</ThemedText>
+      ) : (
+        candidates.map((item, index) => (
+          <Card
+            key={index}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <ThemedText style={{ flex: 1 }}>{item.label}</ThemedText>
+            <Button
+              label={item.checked ? 'Added' : 'Add'}
+              variant={item.checked ? 'primary' : 'secondary'}
+              onPress={() => toggle(index)}
+            />
+          </Card>
+        ))
+      )}
 
-          <Button
-            label={isSaving ? 'Adding…' : 'Add to grocery list'}
-            onPress={handleAddToGroceryList}
-            disabled={isSaving || candidates.every((item) => !item.checked)}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
+
+      <Button
+        label={isSaving ? 'Adding…' : 'Add to grocery list'}
+        onPress={handleAddToGroceryList}
+        disabled={isSaving || candidates.every((item) => !item.checked)}
+      />
+    </Screen>
   );
 }

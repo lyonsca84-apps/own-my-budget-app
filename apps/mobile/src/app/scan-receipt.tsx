@@ -2,7 +2,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { getCurrentAccount, getFeatureUsageCount, scanReceipt } from '@own-my-budget/api';
 import {
   evaluateFeatureGate,
@@ -13,13 +12,14 @@ import {
 } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { GuestGate } from '@/components/ui/guest-gate';
+import { Screen } from '@/components/ui/screen';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { scanHandoff } from '@/lib/scan-handoff';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 export default function ScanReceiptScreen() {
   const { status, user } = useAuth();
@@ -85,73 +85,58 @@ export default function ScanReceiptScreen() {
 
   if (status !== 'signedIn') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={{ padding: Spacing.five }}>
-            <Card>
-              <ThemedText type="subtitle">Create an account to scan receipts</ThemedText>
-              <View style={{ marginTop: Spacing.three }}>
-                <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-              </View>
-            </Card>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="Create an account to scan receipts"
+        message="Scanning and saving receipts needs a free account so your items and totals stick around."
+      />
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Scan a receipt
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            Take a photo or choose one from your library. You&rsquo;ll review and correct everything
-            before it saves.
-          </ThemedText>
+    <Screen>
+      <ThemedText themeColor="textSecondary">
+        Take a photo or choose one from your library. You&rsquo;ll review and correct everything
+        before it saves.
+      </ThemedText>
 
-          {gate && !gate.allowed ? (
-            <Card>
-              <ThemedText themeColor="danger">{gate.reason}</ThemedText>
-            </Card>
-          ) : gate ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              {gate.kind === 'count' && gate.remaining !== undefined
-                ? `${gate.remaining} scan${gate.remaining === 1 ? '' : 's'} remaining`
-                : null}
-            </ThemedText>
-          ) : null}
+      {gate && !gate.allowed ? (
+        <Card>
+          <ThemedText themeColor="danger">{gate.reason}</ThemedText>
+        </Card>
+      ) : gate ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {gate.kind === 'count' && gate.remaining !== undefined
+            ? `${gate.remaining} scan${gate.remaining === 1 ? '' : 's'} remaining`
+            : null}
+        </ThemedText>
+      ) : null}
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
 
-          {isScanning ? (
-            <View style={{ alignItems: 'center', padding: Spacing.five }}>
-              <ActivityIndicator />
-              <ThemedText style={{ marginTop: Spacing.two }}>Reading your receipt…</ThemedText>
-            </View>
-          ) : (
-            <View style={{ gap: Spacing.three }}>
-              <Button
-                label="Take a photo"
-                onPress={() => handlePick('camera')}
-                disabled={!gate?.allowed}
-              />
-              <Button
-                label="Choose from library"
-                variant="secondary"
-                onPress={() => handlePick('library')}
-                disabled={!gate?.allowed}
-              />
-            </View>
-          )}
+      {isScanning ? (
+        <View style={{ alignItems: 'center', padding: Space[5] }}>
+          <ActivityIndicator />
+          <ThemedText style={{ marginTop: Space[2] }}>Reading your receipt…</ThemedText>
         </View>
-      </SafeAreaView>
-    </ThemedView>
+      ) : (
+        <View style={{ gap: Space[3] }}>
+          <Button
+            label="Take a photo"
+            onPress={() => handlePick('camera')}
+            disabled={!gate?.allowed}
+          />
+          <Button
+            label="Choose from library"
+            variant="secondary"
+            onPress={() => handlePick('library')}
+            disabled={!gate?.allowed}
+          />
+        </View>
+      )}
+    </Screen>
   );
 }

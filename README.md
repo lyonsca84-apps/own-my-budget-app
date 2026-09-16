@@ -19,6 +19,8 @@ See [`PLAN.md`](./PLAN.md) for the full product plan and [`IMPLEMENTATION_CHECKL
 
 ```
 apps/mobile/          Expo Router app (iOS + web)
+apps/mobile/src/design-system/  Brand token exports, font loader, and asset registries
+apps/mobile/assets/design-system/  Production brand, badge, goal, and photo assets
 packages/core/         Pure TypeScript: money math, dates, debt/savings/report calculations
 packages/api/          Typed Supabase data-access layer — the only place that talks to @supabase/supabase-js
 supabase/migrations/   Postgres schema, RLS policies, and functions, in applied order
@@ -26,6 +28,9 @@ supabase/functions/    Deno Edge Functions (AI proxying, Stripe, account deletio
 supabase/seed.sql      Two isolated test users for RLS verification
 docs/                  Setup guides for AI, Stripe, auth, and database; production readiness checklist
 ```
+
+See [`docs/design-system.md`](./docs/design-system.md) for the design-system folder map,
+usage examples, implementation rules, and recommended UI rollout order.
 
 ## Local setup
 

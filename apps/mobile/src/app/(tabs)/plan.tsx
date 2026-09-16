@@ -1,19 +1,19 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { listCategories, listIncomeSources, listPaychecks, type Tables } from '@own-my-budget/api';
-import { formatCents } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { CurrencyText } from '@/components/ui/currency-text';
+import { GuestGate } from '@/components/ui/guest-gate';
+import { Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { SectionCard } from '@/components/ui/section-card';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 export default function PlanScreen() {
   const { status, user } = useAuth();
@@ -46,155 +46,101 @@ export default function PlanScreen() {
 
   if (status === 'guest') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          <View style={{ flex: 1, justifyContent: 'center', padding: Spacing.four }}>
-            <EmptyState
-              title="Ready to plan for real?"
-              message="Guest mode shows sample data only. Create a free account to add your own income, categories, and paychecks."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="Ready to plan for real?"
+        message="Guest mode shows sample data only. Create a free account to add your own income, categories, and paychecks."
+      />
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.four, gap: Spacing.four }}>
-          <View
-            style={{
-              width: '100%',
-              maxWidth: MaxContentWidth,
-              alignSelf: 'center',
-              gap: Spacing.four,
-            }}
-          >
-            <ThemedText type="title" style={{ fontSize: 24 }}>
-              Plan
-            </ThemedText>
+    <Screen>
+      <ScreenHeader title="Plan" />
 
-            <Card style={{ gap: Spacing.three }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <ThemedText type="smallBold">Income sources</ThemedText>
-                <Button
-                  label="+ Add"
-                  variant="secondary"
-                  onPress={() => router.push('/add-income')}
-                />
-              </View>
-              {!isLoading && incomeSources.length === 0 && (
-                <ThemedText themeColor="textSecondary" type="small">
-                  No income sources yet.
-                </ThemedText>
-              )}
-              {incomeSources.map((income) => (
-                <View
-                  key={income.id}
-                  style={{ flexDirection: 'row', justifyContent: 'space-between' }}
-                >
-                  <ThemedText>{income.label}</ThemedText>
-                  <ThemedText style={{ fontWeight: '700' }}>
-                    {formatCents(income.amount_cents)}
-                  </ThemedText>
-                </View>
-              ))}
-            </Card>
+      <SectionCard
+        title="Income sources"
+        action={
+          <Button label="+ Add" variant="secondary" onPress={() => router.push('/add-income')} />
+        }
+      >
+        {!isLoading && incomeSources.length === 0 && (
+          <ThemedText themeColor="textSecondary" type="small">
+            No income sources yet.
+          </ThemedText>
+        )}
+        <View style={{ gap: Space[3] }}>
+          {incomeSources.map((income) => (
+            <View key={income.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <ThemedText>{income.label}</ThemedText>
+              <CurrencyText cents={income.amount_cents} size="row" />
+            </View>
+          ))}
+        </View>
+      </SectionCard>
 
-            <Card style={{ gap: Spacing.three }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <ThemedText type="smallBold">Categories</ThemedText>
-                <Button
-                  label="+ Add"
-                  variant="secondary"
-                  onPress={() => router.push('/add-category')}
-                />
-              </View>
-              {!isLoading && categories.length === 0 && (
-                <ThemedText themeColor="textSecondary" type="small">
-                  No categories yet.
-                </ThemedText>
-              )}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-                {categories.map((category) => (
-                  <StatusPill key={category.id} label={category.name} tone="neutral" />
-                ))}
-              </View>
-            </Card>
+      <SectionCard
+        title="Categories"
+        action={
+          <Button label="+ Add" variant="secondary" onPress={() => router.push('/add-category')} />
+        }
+      >
+        {!isLoading && categories.length === 0 && (
+          <ThemedText themeColor="textSecondary" type="small">
+            No categories yet.
+          </ThemedText>
+        )}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+          {categories.map((category) => (
+            <StatusPill key={category.id} label={category.name} tone="neutral" />
+          ))}
+        </View>
+      </SectionCard>
 
-            <Card style={{ gap: Spacing.three }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <ThemedText type="smallBold">Paychecks</ThemedText>
-                <Button
-                  label="+ Add"
-                  variant="secondary"
-                  onPress={() => router.push('/add-paycheck')}
-                />
-              </View>
-              {!isLoading && paychecks.length === 0 && (
-                <ThemedText themeColor="textSecondary" type="small">
-                  No paychecks logged yet.
+      <SectionCard
+        title="Paychecks"
+        action={
+          <Button label="+ Add" variant="secondary" onPress={() => router.push('/add-paycheck')} />
+        }
+      >
+        {!isLoading && paychecks.length === 0 && (
+          <ThemedText themeColor="textSecondary" type="small">
+            No paychecks logged yet.
+          </ThemedText>
+        )}
+        <View style={{ gap: Space[3] }}>
+          {paychecks.map((paycheck) => (
+            <View
+              key={paycheck.id}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View>
+                <CurrencyText cents={paycheck.amount_cents} size="row" />
+                <ThemedText type="small" themeColor="textSecondary">
+                  {paycheck.pay_date}
                 </ThemedText>
+              </View>
+              {paycheck.is_assigned ? (
+                <StatusPill label="Assigned" tone="success" />
+              ) : (
+                <Button
+                  label="Assign"
+                  variant="secondary"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/assign-paycheck',
+                      params: { paycheckId: paycheck.id },
+                    })
+                  }
+                />
               )}
-              {paychecks.map((paycheck) => (
-                <View
-                  key={paycheck.id}
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View>
-                    <ThemedText style={{ fontWeight: '700' }}>
-                      {formatCents(paycheck.amount_cents)}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {paycheck.pay_date}
-                    </ThemedText>
-                  </View>
-                  {paycheck.is_assigned ? (
-                    <StatusPill label="Assigned" tone="success" />
-                  ) : (
-                    <Button
-                      label="Assign"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/assign-paycheck',
-                          params: { paycheckId: paycheck.id },
-                        })
-                      }
-                    />
-                  )}
-                </View>
-              ))}
-            </Card>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+            </View>
+          ))}
+        </View>
+      </SectionCard>
+    </Screen>
   );
 }

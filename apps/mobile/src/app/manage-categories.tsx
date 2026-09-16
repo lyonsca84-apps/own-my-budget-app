@@ -1,18 +1,17 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { archiveCategory, listCategories, renameCategory, type Tables } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 export default function ManageCategoriesScreen() {
   const { user } = useAuth();
@@ -52,64 +51,48 @@ export default function ManageCategoriesScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.three }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Manage categories
-          </ThemedText>
+    <Screen>
+      <Button label="Add category" onPress={() => router.push('/add-category')} />
 
-          <Button label="Add category" onPress={() => router.push('/add-category')} />
-
-          {isLoading ? (
-            <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-          ) : categories.length === 0 ? (
-            <EmptyState
-              title="No categories yet"
-              message="Add one to start organizing bills and budgets."
-            />
+      {isLoading ? (
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      ) : categories.length === 0 ? (
+        <EmptyState
+          title="No categories yet"
+          message="Add one to start organizing bills and budgets."
+        />
+      ) : (
+        categories.map((category) =>
+          editingId === category.id ? (
+            <Card key={category.id} style={{ gap: Space[2] }}>
+              <TextField label="Name" value={editingName} onChangeText={setEditingName} />
+              <View style={{ flexDirection: 'row', gap: Space[2] }}>
+                <Button label="Save" onPress={handleSaveRename} disabled={!editingName.trim()} />
+                <Button label="Cancel" variant="secondary" onPress={() => setEditingId(null)} />
+              </View>
+            </Card>
           ) : (
-            categories.map((category) =>
-              editingId === category.id ? (
-                <Card key={category.id} style={{ gap: Spacing.two }}>
-                  <TextField label="Name" value={editingName} onChangeText={setEditingName} />
-                  <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Button
-                      label="Save"
-                      onPress={handleSaveRename}
-                      disabled={!editingName.trim()}
-                    />
-                    <Button label="Cancel" variant="secondary" onPress={() => setEditingId(null)} />
-                  </View>
-                </Card>
-              ) : (
-                <Card
-                  key={category.id}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <ThemedText>{category.name}</ThemedText>
-                  <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Button
-                      label="Rename"
-                      variant="secondary"
-                      onPress={() => startEditing(category)}
-                    />
-                    <Button
-                      label="Archive"
-                      variant="secondary"
-                      onPress={() => handleArchive(category.id)}
-                    />
-                  </View>
-                </Card>
-              )
-            )
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+            <Card
+              key={category.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <ThemedText>{category.name}</ThemedText>
+              <View style={{ flexDirection: 'row', gap: Space[2] }}>
+                <Button label="Rename" variant="secondary" onPress={() => startEditing(category)} />
+                <Button
+                  label="Archive"
+                  variant="secondary"
+                  onPress={() => handleArchive(category.id)}
+                />
+              </View>
+            </Card>
+          )
+        )
+      )}
+    </Screen>
   );
 }

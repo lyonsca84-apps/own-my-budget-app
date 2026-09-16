@@ -1,10 +1,22 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { Fonts, Typography, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?:
+    | 'default'
+    | 'title'
+    | 'display'
+    | 'small'
+    | 'smallBold'
+    | 'subtitle'
+    | 'amount'
+    | 'amountSmall'
+    | 'eyebrow'
+    | 'link'
+    | 'linkPrimary'
+    | 'code';
   themeColor?: ThemeColor;
 };
 
@@ -17,9 +29,13 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         { color: theme[themeColor ?? 'text'] },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
+        type === 'display' && styles.display,
         type === 'small' && styles.small,
         type === 'smallBold' && styles.smallBold,
         type === 'subtitle' && styles.subtitle,
+        type === 'amount' && styles.amount,
+        type === 'amountSmall' && styles.amountSmall,
+        type === 'eyebrow' && styles.eyebrow,
         type === 'link' && styles.link,
         type === 'linkPrimary' && [styles.linkPrimary, { color: theme.primary }],
         type === 'code' && styles.code,
@@ -30,43 +46,50 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
   );
 }
 
+// Body text never drops below 17px — the accessibility floor the design
+// system carries over from PLAN.md. Currency amounts use tabular-nums
+// wherever they're set in Poppins so columns of money don't jitter.
 const styles = StyleSheet.create({
   small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
+    ...Typography.caption,
   },
   smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
+    ...Typography.caption,
+    fontFamily: Fonts.body.semibold,
   },
   default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
+    ...Typography.body,
   },
   title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
+    ...Typography.h1,
+  },
+  display: {
+    ...Typography.display,
   },
   subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
+    ...Typography.h2,
+  },
+  amount: {
+    ...Typography.amount,
+  },
+  amountSmall: {
+    ...Typography.amountSmall,
+  },
+  eyebrow: {
+    ...Typography.eyebrow,
   },
   link: {
-    lineHeight: 30,
-    fontSize: 14,
+    fontFamily: Fonts.body.semibold,
+    lineHeight: 28,
+    fontSize: 15,
   },
   linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
+    fontFamily: Fonts.body.semibold,
+    lineHeight: 28,
+    fontSize: 15,
   },
   code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
+    fontFamily: Fonts.mono.medium,
     fontSize: 12,
   },
 });

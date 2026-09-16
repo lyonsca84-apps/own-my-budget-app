@@ -49,7 +49,11 @@ export default function SignUpScreen() {
                 We sent a confirmation link to {email}. Follow it to finish creating your account,
                 then come back and log in.
               </ThemedText>
-              <Button label="Back to log in" onPress={() => router.replace('/sign-in')} />
+              <Button
+                label="Back to log in"
+                variant="panel"
+                onPress={() => router.replace('/sign-in')}
+              />
             </Card>
           </View>
         </SafeAreaView>
@@ -92,6 +96,7 @@ export default function SignUpScreen() {
             ) : null}
             <Button
               label={isSubmitting ? 'Creating account…' : 'Create account'}
+              variant="panel"
               onPress={handleSignUp}
               disabled={isSubmitting || !email || !password}
             />

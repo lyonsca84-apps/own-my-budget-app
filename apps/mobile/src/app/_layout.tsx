@@ -4,13 +4,37 @@ import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { Colors } from '@/constants/theme';
+import { useBrandFonts } from '@/design-system/use-brand-fonts';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded, fontError] = useBrandFonts();
+
+  // Keep the native splash screen up (already told not to auto-hide, above)
+  // until Poppins/Figtree/IBM Plex Mono are ready — otherwise every screen
+  // flashes system-font text for a frame before the brand type swaps in.
+  if (!fontsLoaded && !fontError) return null;
+
+  const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const navigationTheme = {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.backgroundElement,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.danger,
+    },
+  };
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={navigationTheme}>
       <AuthProvider>
         <AnimatedSplashOverlay />
         <RootNavigator />
@@ -24,6 +48,7 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'settings', title: 'Settings' },
   { name: 'add-category', title: 'Add category' },
   { name: 'add-income', title: 'Add income' },
+  { name: 'add-transaction', title: 'Add transaction' },
   { name: 'add-paycheck', title: 'Log a paycheck' },
   { name: 'assign-paycheck', title: 'Assign paycheck' },
   { name: 'add-bill', title: 'Add bill' },
@@ -38,6 +63,7 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'review-pantry', title: 'Review pantry scan' },
   { name: 'grocery-list', title: 'Grocery list' },
   { name: 'reports', title: 'Reports' },
+  { name: 'helper', title: 'Budget Buddy' },
   { name: 'report-spending', title: 'Spending by category' },
   { name: 'report-income-expenses', title: 'Income vs. expenses' },
   { name: 'report-debt-savings', title: 'Debt & savings progress' },

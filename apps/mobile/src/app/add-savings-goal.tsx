@@ -1,13 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { createSavingsChallenge, createSavingsGoal } from '@own-my-budget/api';
 import { formatCents, generateChallengeAmounts, type ChallengeType } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -81,89 +80,82 @@ export default function AddSavingsGoalScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Add savings goal
-          </ThemedText>
+    <Screen>
+      <TextField
+        label="What are you saving for?"
+        value={label}
+        onChangeText={setLabel}
+        placeholder="e.g. Emergency Fund"
+      />
 
-          <TextField
-            label="What are you saving for?"
-            value={label}
-            onChangeText={setLabel}
-            placeholder="e.g. Emergency Fund"
-          />
+      <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+        <Button
+          label="Regular goal"
+          variant={!isChallenge ? 'primary' : 'secondary'}
+          onPress={() => setIsChallenge(false)}
+        />
+        <Button
+          label="52-week challenge"
+          variant={isChallenge ? 'primary' : 'secondary'}
+          onPress={() => setIsChallenge(true)}
+        />
+      </View>
 
-          <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-            <Button
-              label="Regular goal"
-              variant={!isChallenge ? 'primary' : 'secondary'}
-              onPress={() => setIsChallenge(false)}
-            />
-            <Button
-              label="52-week challenge"
-              variant={isChallenge ? 'primary' : 'secondary'}
-              onPress={() => setIsChallenge(true)}
-            />
+      {isChallenge ? (
+        <>
+          <View style={{ gap: Spacing.one }}>
+            <ThemedText type="smallBold">Challenge style</ThemedText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
+              {CHALLENGE_TYPES.map((option) => (
+                <Button
+                  key={option}
+                  label={CHALLENGE_LABEL[option]}
+                  variant={option === challengeType ? 'primary' : 'secondary'}
+                  onPress={() => setChallengeType(option)}
+                />
+              ))}
+            </View>
           </View>
-
-          {isChallenge ? (
-            <>
-              <View style={{ gap: Spacing.one }}>
-                <ThemedText type="smallBold">Challenge style</ThemedText>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-                  {CHALLENGE_TYPES.map((option) => (
-                    <Button
-                      key={option}
-                      label={CHALLENGE_LABEL[option]}
-                      variant={option === challengeType ? 'primary' : 'secondary'}
-                      onPress={() => setChallengeType(option)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <TextField
-                label="Target total for the year"
-                value={flatTarget}
-                onChangeText={setFlatTarget}
-                placeholder="1378"
-                keyboardType="decimal-pad"
-              />
-              <ThemedText type="small" themeColor="textSecondary">
-                52 weekly deposits totaling {formatCents(challengeTotalCents)}.
-              </ThemedText>
-            </>
-          ) : (
-            <TextField
-              label="Target amount"
-              value={manualTarget}
-              onChangeText={setManualTarget}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-            />
-          )}
-
           <TextField
-            label="Target date (optional)"
-            value={targetDate}
-            onChangeText={setTargetDate}
-            placeholder="YYYY-MM-DD"
+            label="Target total for the year"
+            value={flatTarget}
+            onChangeText={setFlatTarget}
+            placeholder="1378"
+            keyboardType="decimal-pad"
           />
+          <ThemedText type="small" themeColor="textSecondary">
+            52 weekly deposits totaling {formatCents(challengeTotalCents)}.
+          </ThemedText>
+        </>
+      ) : (
+        <TextField
+          label="Target amount"
+          value={manualTarget}
+          onChangeText={setManualTarget}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+        />
+      )}
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+      <TextField
+        label="Target date (optional)"
+        value={targetDate}
+        onChangeText={setTargetDate}
+        placeholder="YYYY-MM-DD"
+      />
 
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save goal'}
-            onPress={handleSave}
-            disabled={isSubmitting || !label.trim()}
-          />
-        </View>
-      </SafeAreaView>
-    </ThemedView>
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
+
+      <Button
+        variant="panel"
+        label={isSubmitting ? 'Saving…' : 'Save goal'}
+        onPress={handleSave}
+        disabled={isSubmitting || !label.trim()}
+      />
+    </Screen>
   );
 }

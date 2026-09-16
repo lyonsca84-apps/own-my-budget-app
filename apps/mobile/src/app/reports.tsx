@@ -1,18 +1,18 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { getCurrentAccount } from '@own-my-budget/api';
 import { evaluateFeatureGate, type FeatureGateResult, type PlanTier } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { GuestGate } from '@/components/ui/guest-gate';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 const REPORTS: {
   title: string;
@@ -55,66 +55,41 @@ export default function ReportsScreen() {
 
   if (status !== 'signedIn') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={{ padding: Spacing.five }}>
-            <EmptyState
-              title="See your full picture"
-              message="Create a free account to unlock spending, income, and progress reports."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="See your full picture"
+        message="Create a free account to unlock spending, income, and progress reports."
+      />
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.three }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Reports
-          </ThemedText>
+    <Screen>
+      {gate && !gate.allowed ? (
+        <Card>
+          <ThemedText themeColor="warning">{gate.reason}</ThemedText>
+        </Card>
+      ) : null}
 
-          {gate && !gate.allowed ? (
-            <Card>
-              <ThemedText themeColor="danger">{gate.reason}</ThemedText>
-            </Card>
-          ) : null}
-
-          {REPORTS.map((report) => (
-            <Card key={report.href} style={{ gap: Spacing.two }}>
-              <ThemedText type="subtitle" style={{ fontSize: 18 }}>
-                {report.title}
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">{report.description}</ThemedText>
-              <Button
-                label="View"
-                variant="secondary"
-                onPress={() => router.push(report.href)}
-                disabled={!gate?.allowed}
-              />
-            </Card>
-          ))}
-
-          <Card style={{ gap: Spacing.two }}>
-            <ThemedText type="subtitle" style={{ fontSize: 18 }}>
-              Export your data
-            </ThemedText>
-            <ThemedText themeColor="textSecondary">
-              CSV and JSON, available on every plan.
-            </ThemedText>
+      {REPORTS.map((report) => (
+        <SectionCard key={report.href} title={report.title}>
+          <View style={{ gap: Space[3] }}>
+            <ThemedText themeColor="textSecondary">{report.description}</ThemedText>
             <Button
-              label="Export"
+              label="View"
               variant="secondary"
-              onPress={() => router.push('/export-data')}
+              onPress={() => router.push(report.href)}
+              disabled={!gate?.allowed}
             />
-          </Card>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+          </View>
+        </SectionCard>
+      ))}
+
+      <SectionCard title="Export your data">
+        <View style={{ gap: Space[3] }}>
+          <ThemedText themeColor="textSecondary">CSV and JSON, available on every plan.</ThemedText>
+          <Button label="Export" variant="secondary" onPress={() => router.push('/export-data')} />
+        </View>
+      </SectionCard>
+    </Screen>
   );
 }

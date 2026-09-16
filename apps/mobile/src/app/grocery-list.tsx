@@ -1,7 +1,6 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import {
   addGroceryItems,
   getOrCreateDefaultGroceryList,
@@ -9,17 +8,18 @@ import {
   toggleGroceryItem,
   type Tables,
 } from '@own-my-budget/api';
-import { formatCents } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { CurrencyText } from '@/components/ui/currency-text';
 import { EmptyState } from '@/components/ui/empty-state';
+import { GuestGate } from '@/components/ui/guest-gate';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 export default function GroceryListScreen() {
   const { status, user } = useAuth();
@@ -64,48 +64,39 @@ export default function GroceryListScreen() {
 
   if (status === 'guest') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={{ padding: Spacing.five }}>
-            <EmptyState
-              title="Track your grocery list"
-              message="Create a free account to keep a grocery list and pull items in from pantry scans."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="Track your grocery list"
+        message="Create a free account to keep a grocery list and pull items in from pantry scans."
+      />
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.three }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Grocery list
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            Estimated remaining: {formatCents(estimatedTotalCents)}
-          </ThemedText>
+    <Screen>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <ThemedText themeColor="textSecondary">Estimated remaining</ThemedText>
+        <CurrencyText cents={estimatedTotalCents} size="row" />
+      </View>
 
-          {isLoading ? (
-            <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-          ) : items.length === 0 ? (
-            <EmptyState
-              title="Your list is empty"
-              message="Add an item below, or scan your pantry for suggestions."
-            />
-          ) : (
-            items.map((item) => (
-              <Card
+      {isLoading ? (
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="Your list is empty"
+          message="Add an item below, or scan your pantry for suggestions."
+          mascot
+        />
+      ) : (
+        <SectionCard title="Items">
+          <View style={{ gap: Space[4] }}>
+            {items.map((item) => (
+              <View
                 key={item.id}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: Space[3],
                 }}
               >
                 <ThemedText
@@ -119,24 +110,24 @@ export default function GroceryListScreen() {
                   variant={item.is_checked ? 'secondary' : 'primary'}
                   onPress={() => handleToggle(item.id, !item.is_checked)}
                 />
-              </Card>
-            ))
-          )}
-
-          <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-end' }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label="Add an item"
-                value={newItemLabel}
-                onChangeText={setNewItemLabel}
-                placeholder="e.g. Milk"
-                onSubmitEditing={handleAddItem}
-              />
-            </View>
-            <Button label="Add" onPress={handleAddItem} disabled={!newItemLabel.trim()} />
+              </View>
+            ))}
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+        </SectionCard>
+      )}
+
+      <View style={{ flexDirection: 'row', gap: Space[2], alignItems: 'flex-end' }}>
+        <View style={{ flex: 1 }}>
+          <TextField
+            label="Add an item"
+            value={newItemLabel}
+            onChangeText={setNewItemLabel}
+            placeholder="e.g. Milk"
+            onSubmitEditing={handleAddItem}
+          />
+        </View>
+        <Button label="Add" onPress={handleAddItem} disabled={!newItemLabel.trim()} />
+      </View>
+    </Screen>
   );
 }
