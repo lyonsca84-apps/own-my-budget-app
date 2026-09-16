@@ -1,16 +1,16 @@
 import { Pressable, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing, type ThemeColor } from '@/constants/theme';
+import { Fonts, Layout, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> {
   label: string;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'panel' | 'secondary' | 'quiet';
 }
 
 /** 44pt minimum tap target per PLAN.md's accessibility rules — never make this shorter. */
-const MIN_TOUCH_TARGET = 44;
+const MIN_TOUCH_TARGET = Layout.minimumTouchTarget;
 
 export interface IconButtonProps extends Omit<PressableProps, 'style'> {
   accessibilityLabel: string;
@@ -27,11 +27,11 @@ export function IconButton({ children, accessibilityLabel, ...props }: IconButto
       style={({ pressed }) => ({
         minHeight: MIN_TOUCH_TARGET,
         minWidth: MIN_TOUCH_TARGET,
-        borderRadius: Spacing.three,
+        borderRadius: Radius.input,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: theme.border,
+        borderWidth: 1.5,
+        borderColor: theme.controlBorder,
         opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1,
       })}
       {...props}
@@ -44,25 +44,45 @@ export function IconButton({ children, accessibilityLabel, ...props }: IconButto
 export function Button({ label, variant = 'primary', ...props }: ButtonProps) {
   const theme = useTheme();
   const isPrimary = variant === 'primary';
-  const textColor: ThemeColor = isPrimary ? 'onPrimary' : 'primary';
+  const isPanel = variant === 'panel';
+  const isSecondary = variant === 'secondary';
+  const backgroundColor = props.disabled
+    ? theme.disabledSurface
+    : isPanel
+      ? theme.panel
+      : isPrimary
+        ? theme.primary
+        : 'transparent';
+  const textColor = props.disabled
+    ? theme.disabled
+    : isPanel
+      ? theme.onPanel
+      : isPrimary
+        ? theme.onPrimary
+        : isSecondary
+          ? theme.text
+          : theme.primary;
 
   return (
     <Pressable
       accessibilityRole="button"
       style={({ pressed }) => ({
-        minHeight: MIN_TOUCH_TARGET,
-        borderRadius: Spacing.three,
-        paddingHorizontal: Spacing.four,
+        minHeight: variant === 'quiet' ? MIN_TOUCH_TARGET : Layout.controlHeight,
+        borderRadius: Radius.full,
+        paddingHorizontal: isPrimary || isPanel ? 26 : 20,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isPrimary ? theme.primary : 'transparent',
-        borderWidth: isPrimary ? 0 : 1,
-        borderColor: theme.primary,
-        opacity: props.disabled ? 0.5 : pressed ? 0.85 : 1,
+        backgroundColor,
+        borderWidth: isSecondary ? 1.5 : 0,
+        borderColor: isSecondary ? theme.controlBorder : 'transparent',
+        opacity: pressed && !props.disabled ? 0.82 : 1,
       })}
       {...props}
     >
-      <ThemedText type="smallBold" themeColor={textColor}>
+      <ThemedText
+        type="smallBold"
+        style={{ color: textColor, fontFamily: Fonts.body.semibold, fontSize: 17, lineHeight: 24 }}
+      >
         {label}
       </ThemedText>
     </Pressable>

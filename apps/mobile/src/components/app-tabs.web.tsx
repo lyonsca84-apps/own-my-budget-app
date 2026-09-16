@@ -1,4 +1,5 @@
 import type { ComponentProps, PropsWithChildren } from 'react';
+import { Image } from 'expo-image';
 import { Tabs, TabList, TabTrigger, TabSlot, type TabTriggerSlotProps } from 'expo-router/ui';
 import { Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
@@ -7,7 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
 import { NAV_ITEMS } from '@/constants/nav';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, Layout, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrandAssets } from '@/design-system/assets/brand';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Below this width, the sidebar collapses into a bottom tab bar (mobile web). */
@@ -46,7 +48,7 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
       style={
         isWide
           ? {
-              width: 230,
+              width: Layout.sidebarWidth,
               flexShrink: 0,
               backgroundColor: theme.backgroundElement,
               borderRightWidth: 1,
@@ -76,21 +78,16 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
       {isWide && (
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: Spacing.two,
+            alignItems: 'flex-start',
             paddingHorizontal: Spacing.two,
           }}
         >
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: Spacing.two,
-              backgroundColor: theme.primary,
-            }}
+          <Image
+            source={BrandAssets.horizontalLockup}
+            contentFit="contain"
+            style={{ width: 190, height: 88 }}
+            accessibilityLabel="Own My Budget"
           />
-          <ThemedText type="smallBold">Own My{'\n'}Budget</ThemedText>
         </View>
       )}
 
@@ -145,9 +142,7 @@ function AccountSummary() {
     >
       <Avatar name={name} size={28} />
       <View>
-        <ThemedText type="small" style={{ fontWeight: '700' }}>
-          {name}
-        </ThemedText>
+        <ThemedText type="smallBold">{name}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {actionDescription}
         </ThemedText>
@@ -168,7 +163,7 @@ function BudgetBuddyUpsellCard() {
         gap: Spacing.one,
       }}
     >
-      <ThemedText type="small" themeColor="onPrimary" style={{ fontWeight: '700' }}>
+      <ThemedText type="smallBold" themeColor="onPrimary">
         Meet Budget Buddy
       </ThemedText>
       <ThemedText type="small" themeColor="onPrimary" style={{ opacity: 0.9 }}>
@@ -197,13 +192,24 @@ function NavButton({
           borderRadius: Spacing.three,
           paddingVertical: Spacing.two,
           paddingHorizontal: Spacing.three,
-          backgroundColor: isFocused ? theme.primaryMuted : 'transparent',
+          backgroundColor: isFocused ? theme.backgroundSelected : 'transparent',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: Spacing.two,
         }}
       >
+        <View
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 999,
+            backgroundColor: isFocused ? theme.primary : 'transparent',
+          }}
+        />
         <ThemedText
-          type="small"
+          type="default"
           themeColor={isFocused ? 'primary' : 'text'}
-          style={{ fontWeight: isFocused ? '700' : '500' }}
+          style={{ fontFamily: isFocused ? Fonts.body.semibold : Fonts.body.regular }}
         >
           {label}
         </ThemedText>
@@ -233,7 +239,11 @@ function NavButton({
       <ThemedText
         type="small"
         themeColor={isFocused ? 'primary' : 'textSecondary'}
-        style={{ fontWeight: isFocused ? '700' : '500', fontSize: 11 }}
+        style={{
+          fontFamily: isFocused ? Fonts.body.semibold : Fonts.body.medium,
+          fontSize: 11,
+          lineHeight: 14,
+        }}
       >
         {label}
       </ThemedText>

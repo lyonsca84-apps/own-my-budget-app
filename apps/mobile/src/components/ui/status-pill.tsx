@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing, type ThemeColor } from '@/constants/theme';
+import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type StatusTone = 'success' | 'warning' | 'danger' | 'neutral';
@@ -32,8 +32,8 @@ export function StatusPill({ label, tone }: StatusPillProps) {
       style={{
         alignSelf: 'flex-start',
         backgroundColor: theme[colors.bg],
-        borderRadius: Spacing.four,
-        paddingVertical: Spacing.one,
+        borderRadius: Radius.full,
+        paddingVertical: 7,
         paddingHorizontal: Spacing.three,
       }}
     >
