@@ -1,12 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { createCategory, type Database } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -44,47 +43,35 @@ export default function AddCategoryScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Add category
-          </ThemedText>
+    <Screen>
+      <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Groceries" />
 
-          <TextField
-            label="Name"
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. Groceries"
-          />
-
-          <View style={{ gap: Spacing.one }}>
-            <ThemedText type="smallBold">Type</ThemedText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-              {CATEGORY_TYPES.map((option) => (
-                <Button
-                  key={option}
-                  label={option}
-                  variant={option === type ? 'primary' : 'secondary'}
-                  onPress={() => setType(option)}
-                />
-              ))}
-            </View>
-          </View>
-
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save category'}
-            onPress={handleSave}
-            disabled={isSubmitting || !name.trim()}
-          />
+      <View style={{ gap: Spacing.one }}>
+        <ThemedText type="smallBold">Type</ThemedText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
+          {CATEGORY_TYPES.map((option) => (
+            <Button
+              key={option}
+              label={option}
+              variant={option === type ? 'primary' : 'secondary'}
+              onPress={() => setType(option)}
+            />
+          ))}
         </View>
-      </SafeAreaView>
-    </ThemedView>
+      </View>
+
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
+
+      <Button
+        variant="panel"
+        label={isSubmitting ? 'Saving…' : 'Save category'}
+        onPress={handleSave}
+        disabled={isSubmitting || !name.trim()}
+      />
+    </Screen>
   );
 }

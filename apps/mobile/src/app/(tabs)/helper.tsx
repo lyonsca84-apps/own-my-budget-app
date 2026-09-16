@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { GuestGate } from '@/components/ui/guest-gate';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -98,19 +98,10 @@ export default function HelperScreen() {
 
   if (status === 'guest') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          <View style={{ flex: 1, justifyContent: 'center', padding: Spacing.four }}>
-            <EmptyState
-              title="Meet Budget Buddy"
-              message="Create a free account to chat with Budget Buddy and scan receipts or your pantry."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="Meet Budget Buddy"
+        message="Create a free account to chat with Budget Buddy and scan receipts or your pantry."
+      />
     );
   }
 
@@ -130,9 +121,7 @@ export default function HelperScreen() {
               paddingBottom: 0,
             }}
           >
-            <ThemedText type="title" style={{ fontSize: 22 }}>
-              Budget Buddy
-            </ThemedText>
+            <ThemedText type="subtitle">Budget Buddy</ThemedText>
             {messages.length > 0 ? (
               <Button label="Clear chat" variant="secondary" onPress={handleClearChat} />
             ) : null}

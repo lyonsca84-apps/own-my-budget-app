@@ -42,7 +42,11 @@ export default function ForgotPasswordScreen() {
               <ThemedText themeColor="textSecondary" style={{ textAlign: 'center' }}>
                 If an account exists for {email}, we sent a link to reset your password.
               </ThemedText>
-              <Button label="Back to log in" onPress={() => router.replace('/sign-in')} />
+              <Button
+                label="Back to log in"
+                variant="panel"
+                onPress={() => router.replace('/sign-in')}
+              />
             </Card>
           </View>
         </SafeAreaView>
@@ -57,9 +61,7 @@ export default function ForgotPasswordScreen() {
           style={{ flex: 1, justifyContent: 'center', padding: Spacing.five, gap: Spacing.four }}
         >
           <View>
-            <ThemedText type="title" style={{ fontSize: 24 }}>
-              Reset your password
-            </ThemedText>
+            <ThemedText type="subtitle">Reset your password</ThemedText>
             <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.one }}>
               We&apos;ll email you a link to set a new one.
             </ThemedText>
@@ -82,6 +84,7 @@ export default function ForgotPasswordScreen() {
             ) : null}
             <Button
               label={isSubmitting ? 'Sending…' : 'Send reset link'}
+              variant="panel"
               onPress={handleSubmit}
               disabled={isSubmitting || !email}
             />

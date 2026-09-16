@@ -1,7 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import {
   listDebtsWithPayments,
   listSavingsGoals,
@@ -17,15 +16,34 @@ import {
 } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { CurrencyText } from '@/components/ui/currency-text';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusPill } from '@/components/ui/status-pill';
+import { GoalCard } from '@/components/ui/goal-card';
+import { Grid } from '@/components/ui/grid';
+import { GuestGate } from '@/components/ui/guest-gate';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { SectionCard } from '@/components/ui/section-card';
+import { SubsectionHeader } from '@/components/ui/subsection-header';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
+import { GoalAssets, type GoalAssetName } from '@/design-system/assets/goals';
+
+const GOAL_ILLUSTRATION: Record<string, GoalAssetName> = {
+  'emergency fund': 'emergencyFund',
+  'family vacation': 'familyVacation',
+  'new laptop': 'newLaptop',
+};
+
+function goalIllustrationFor(label: string) {
+  const key = Object.keys(GOAL_ILLUSTRATION).find((k) => label.toLowerCase().includes(k));
+  return key ? GoalAssets[GOAL_ILLUSTRATION[key]] : undefined;
+}
 
 export default function MoneyScreen() {
   const { status, user } = useAuth();
@@ -74,203 +92,150 @@ export default function MoneyScreen() {
 
   if (status === 'guest') {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          <View style={{ flex: 1, justifyContent: 'center', padding: Spacing.four }}>
-            <EmptyState
-              title="Plan your payoff and savings"
-              message="Guest mode shows sample data only. Create a free account to track your own debts and savings goals."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <GuestGate
+        title="Plan your payoff and savings"
+        message="Guest mode shows sample data only. Create a free account to track your own debts and savings goals."
+      />
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.four, gap: Spacing.four }}>
-          <View
-            style={{
-              width: '100%',
-              maxWidth: MaxContentWidth,
-              alignSelf: 'center',
-              gap: Spacing.four,
-            }}
-          >
-            <ThemedText type="title" style={{ fontSize: 24 }}>
-              Money
+    <Screen>
+      <ScreenHeader title="Money" />
+
+      {/* ---------- Debt ---------- */}
+      <SubsectionHeader
+        title="Debt"
+        action={
+          <Button label="+ Add debt" variant="secondary" onPress={() => router.push('/add-debt')} />
+        }
+      />
+
+      {!isLoading && debts.length === 0 && (
+        <EmptyState
+          title="No debts tracked"
+          message="Add a credit card, loan, or mortgage to get started."
+        />
+      )}
+
+      {debts.map((debt) => {
+        const paidCents = debt.debt_payments.reduce((sum, p) => sum + p.amount_cents, 0);
+        const utilization =
+          debt.type === 'creditCard' && debt.credit_limit_cents
+            ? calculateCreditUtilization(debt.balance_cents, debt.credit_limit_cents)
+            : null;
+        return (
+          <Card key={debt.id} style={{ gap: Space[2] }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <ThemedText type="smallBold">{debt.label}</ThemedText>
+              <CurrencyText cents={debt.balance_cents} size="row" />
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              {(debt.apr_basis_points / 100).toFixed(2)}% APR ·{' '}
+              {formatCents(debt.minimum_payment_cents)}
+              /mo min
+              {utilization !== null ? ` · ${utilization.toFixed(0)}% utilized` : ''}
+              {paidCents > 0 ? ` · ${formatCents(paidCents)} paid so far` : ''}
             </ThemedText>
-
-            {/* ---------- Debt ---------- */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText type="smallBold">Debt</ThemedText>
+            {utilization !== null ? (
+              <ProgressBar percent={utilization} tone={utilization > 70 ? 'watch' : 'primary'} />
+            ) : null}
+            <View style={{ alignSelf: 'flex-start' }}>
               <Button
-                label="+ Add debt"
+                label="Record payment"
                 variant="secondary"
-                onPress={() => router.push('/add-debt')}
+                onPress={() =>
+                  router.push({ pathname: '/record-debt-payment', params: { debtId: debt.id } })
+                }
               />
             </View>
+          </Card>
+        );
+      })}
 
-            {!isLoading && debts.length === 0 && (
-              <EmptyState
-                title="No debts tracked"
-                message="Add a credit card, loan, or mortgage to get started."
-              />
-            )}
+      {debts.length > 0 && (
+        <SectionCard title="Payoff plan: snowball vs. avalanche">
+          <TextField
+            label="Extra you can put toward debt each month"
+            value={extraMonthly}
+            onChangeText={setExtraMonthly}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+          />
+          <Grid gap={Space[3]}>
+            <View style={{ flexGrow: 1, flexBasis: 150 }}>
+              <PayoffSummary title="Snowball" result={snowball} />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 150 }}>
+              <PayoffSummary title="Avalanche" result={avalanche} />
+            </View>
+          </Grid>
+          <ThemedText type="small" themeColor="textSecondary">
+            Snowball pays off the smallest balance first; avalanche pays off the highest interest
+            rate first (usually less total interest).
+          </ThemedText>
+        </SectionCard>
+      )}
 
-            {debts.map((debt) => {
-              const paidCents = debt.debt_payments.reduce((sum, p) => sum + p.amount_cents, 0);
-              const utilization =
-                debt.type === 'creditCard' && debt.credit_limit_cents
-                  ? calculateCreditUtilization(debt.balance_cents, debt.credit_limit_cents)
-                  : null;
-              return (
-                <Card key={debt.id} style={{ gap: Spacing.two }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <ThemedText style={{ fontWeight: '700' }}>{debt.label}</ThemedText>
-                    <ThemedText style={{ fontWeight: '700' }}>
-                      {formatCents(debt.balance_cents)}
-                    </ThemedText>
-                  </View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {(debt.apr_basis_points / 100).toFixed(2)}% APR ·{' '}
-                    {formatCents(debt.minimum_payment_cents)}/mo min
-                    {utilization !== null ? ` · ${utilization.toFixed(0)}% utilized` : ''}
-                    {paidCents > 0 ? ` · ${formatCents(paidCents)} paid so far` : ''}
-                  </ThemedText>
-                  <View style={{ alignSelf: 'flex-start' }}>
-                    <Button
-                      label="Record payment"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/record-debt-payment',
-                          params: { debtId: debt.id },
-                        })
-                      }
-                    />
-                  </View>
-                </Card>
-              );
-            })}
+      {/* ---------- Savings ---------- */}
+      <SubsectionHeader
+        title="Savings goals"
+        action={
+          <Button
+            label="+ Add goal"
+            variant="secondary"
+            onPress={() => router.push('/add-savings-goal')}
+          />
+        }
+      />
 
-            {debts.length > 0 && (
-              <Card style={{ gap: Spacing.three }}>
-                <ThemedText type="smallBold">Payoff plan: snowball vs. avalanche</ThemedText>
-                <TextField
-                  label="Extra you can put toward debt each month"
-                  value={extraMonthly}
-                  onChangeText={setExtraMonthly}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
+      {!isLoading && goals.length === 0 && (
+        <EmptyState
+          title="No savings goals yet"
+          message="Set your first goal — an emergency fund is a great start."
+          mascot
+        />
+      )}
+
+      {goals.map((goal) => {
+        const progress = calculateSavingsProgress(goal.saved_cents, goal.target_cents);
+        return (
+          <GoalCard
+            key={goal.id}
+            title={goal.label}
+            savedCents={goal.saved_cents}
+            targetCents={goal.target_cents}
+            percent={progress.percent}
+            isComplete={progress.isComplete}
+            targetDate={goal.target_date}
+            illustration={goalIllustrationFor(goal.label)}
+            actions={
+              <>
+                <Button
+                  label="Add deposit"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/add-goal-activity',
+                      params: { goalId: goal.id, kind: 'deposit' },
+                    })
+                  }
                 />
-                <View style={{ flexDirection: 'row', gap: Spacing.three }}>
-                  <PayoffSummary title="Snowball" result={snowball} />
-                  <PayoffSummary title="Avalanche" result={avalanche} />
-                </View>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Snowball pays off the smallest balance first; avalanche pays off the highest
-                  interest rate first (usually less total interest).
-                </ThemedText>
-              </Card>
-            )}
-
-            {/* ---------- Savings ---------- */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText type="smallBold">Savings goals</ThemedText>
-              <Button
-                label="+ Add goal"
-                variant="secondary"
-                onPress={() => router.push('/add-savings-goal')}
-              />
-            </View>
-
-            {!isLoading && goals.length === 0 && (
-              <EmptyState
-                title="No savings goals yet"
-                message="Set your first goal — an emergency fund is a great start."
-              />
-            )}
-
-            {goals.map((goal) => {
-              const progress = calculateSavingsProgress(goal.saved_cents, goal.target_cents);
-              return (
-                <Card key={goal.id} style={{ gap: Spacing.two }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <ThemedText style={{ fontWeight: '700' }}>{goal.label}</ThemedText>
-                    {progress.isComplete && <StatusPill label="Reached!" tone="success" />}
-                  </View>
-                  <ThemedText themeColor="textSecondary" type="small">
-                    {formatCents(goal.saved_cents)} of {formatCents(goal.target_cents)} (
-                    {progress.percent.toFixed(0)}%)
-                  </ThemedText>
-                  <View
-                    style={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: '#00000014',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <View
-                      style={{
-                        height: '100%',
-                        width: `${progress.percent}%`,
-                        backgroundColor: progress.isComplete ? '#2F8F4E' : '#0B6FB8',
-                      }}
-                    />
-                  </View>
-                  {!progress.isComplete && goal.target_date && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Target date: {goal.target_date}
-                    </ThemedText>
-                  )}
-                  <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Button
-                      label="Add deposit"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/add-goal-activity',
-                          params: { goalId: goal.id, kind: 'deposit' },
-                        })
-                      }
-                    />
-                    <Button
-                      label="Withdraw"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/add-goal-activity',
-                          params: { goalId: goal.id, kind: 'withdrawal' },
-                        })
-                      }
-                    />
-                  </View>
-                </Card>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+                <Button
+                  label="Withdraw"
+                  variant="secondary"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/add-goal-activity',
+                      params: { goalId: goal.id, kind: 'withdrawal' },
+                    })
+                  }
+                />
+              </>
+            }
+          />
+        );
+      })}
+    </Screen>
   );
 }
 
@@ -282,7 +247,7 @@ function PayoffSummary({
   result: { months: number; totalInterestCents: number; payoffDate: string } | null;
 }) {
   return (
-    <Card style={{ flex: 1, gap: Spacing.half }}>
+    <Card style={{ gap: Space[1] }}>
       <ThemedText type="smallBold">{title}</ThemedText>
       {result ? (
         <>

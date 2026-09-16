@@ -1,24 +1,19 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { listBillPaymentsForReports, listCategories } from '@own-my-budget/api';
-import {
-  calculateCategoryTotals,
-  formatCents,
-  formatLocalDate,
-  type CategoryTotal,
-} from '@own-my-budget/core';
+import { calculateCategoryTotals, formatLocalDate, type CategoryTotal } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { CurrencyText } from '@/components/ui/currency-text';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { useAuth } from '@/contexts/auth-context';
-import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 type RangeOption = '1' | '3' | '6' | 'all';
 const RANGE_LABELS: Record<RangeOption, string> = {
@@ -38,7 +33,6 @@ function fromDateFor(range: RangeOption): string | undefined {
 
 export default function ReportSpendingScreen() {
   const { status, user } = useAuth();
-  const theme = useTheme();
   const [range, setRange] = useState<RangeOption>('3');
   const [totals, setTotals] = useState<CategoryTotal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,62 +63,42 @@ export default function ReportSpendingScreen() {
   const grandTotal = totals.reduce((sum, t) => sum + t.totalCents, 0);
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.three }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Spending by category
-          </ThemedText>
+    <Screen>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+        {(Object.keys(RANGE_LABELS) as RangeOption[]).map((option) => (
+          <Button
+            key={option}
+            label={RANGE_LABELS[option]}
+            variant={option === range ? 'primary' : 'secondary'}
+            onPress={() => setRange(option)}
+          />
+        ))}
+      </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-            {(Object.keys(RANGE_LABELS) as RangeOption[]).map((option) => (
-              <Button
-                key={option}
-                label={RANGE_LABELS[option]}
-                variant={option === range ? 'primary' : 'secondary'}
-                onPress={() => setRange(option)}
-              />
-            ))}
+      {isLoading ? (
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      ) : totals.length === 0 ? (
+        <EmptyState
+          title="No bill payments in this range"
+          message="Record a bill payment from the Bills tab to see spending broken down here."
+        />
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space[2] }}>
+            <ThemedText themeColor="textSecondary">Total</ThemedText>
+            <CurrencyText cents={grandTotal} size="row" themeColor="textSecondary" />
           </View>
-
-          {isLoading ? (
-            <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-          ) : totals.length === 0 ? (
-            <EmptyState
-              title="No bill payments in this range"
-              message="Record a bill payment from the Bills tab to see spending broken down here."
-            />
-          ) : (
-            <>
-              <ThemedText themeColor="textSecondary">Total: {formatCents(grandTotal)}</ThemedText>
-              {totals.map((category) => (
-                <Card key={category.categoryId ?? 'uncategorized'} style={{ gap: Spacing.one }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <ThemedText style={{ fontWeight: '700' }}>{category.categoryName}</ThemedText>
-                    <ThemedText>{formatCents(category.totalCents)}</ThemedText>
-                  </View>
-                  <View
-                    style={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: '#00000014',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <View
-                      style={{
-                        height: '100%',
-                        width: `${(category.totalCents / maxTotal) * 100}%`,
-                        backgroundColor: theme.primary,
-                      }}
-                    />
-                  </View>
-                </Card>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+          {totals.map((category) => (
+            <SectionCard
+              key={category.categoryId ?? 'uncategorized'}
+              title={category.categoryName}
+              action={<CurrencyText cents={category.totalCents} size="row" />}
+            >
+              <ProgressBar percent={(category.totalCents / maxTotal) * 100} />
+            </SectionCard>
+          ))}
+        </>
+      )}
+    </Screen>
   );
 }

@@ -1,13 +1,12 @@
 import { router } from 'expo-router';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { useAuth } from '@/contexts/auth-context';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 /**
  * Top-level (reachable from any tab via the header avatar), not one of the
@@ -21,72 +20,59 @@ export default function SettingsScreen() {
   const isGuest = status === 'guest';
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.four, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Settings
-          </ThemedText>
+    <Screen>
+      <SectionCard title="Account">
+        <ThemedText>{isGuest ? 'Guest — demo data only' : (user?.email ?? '')}</ThemedText>
+      </SectionCard>
 
-          <Card style={{ gap: Spacing.two }}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              ACCOUNT
-            </ThemedText>
-            <ThemedText>{isGuest ? 'Guest — demo data only' : (user?.email ?? '')}</ThemedText>
-          </Card>
-
-          {isGuest ? (
-            <Button
-              label="Create an account"
-              onPress={() => {
-                exitGuestMode();
-                router.replace('/sign-up');
-              }}
-            />
-          ) : (
-            <>
-              <View style={{ gap: Spacing.two }}>
-                <Button
-                  label="Subscription & plan"
-                  variant="secondary"
-                  onPress={() => router.push('/subscription')}
-                />
-                <Button
-                  label="Reports"
-                  variant="secondary"
-                  onPress={() => router.push('/reports')}
-                />
-                <Button
-                  label="Notifications"
-                  variant="secondary"
-                  onPress={() => router.push('/notification-settings')}
-                />
-                <Button
-                  label="Manage categories"
-                  variant="secondary"
-                  onPress={() => router.push('/manage-categories')}
-                />
-                <Button
-                  label="Security"
-                  variant="secondary"
-                  onPress={() => router.push('/security')}
-                />
-                <Button
-                  label="Data & privacy"
-                  variant="secondary"
-                  onPress={() => router.push('/data-privacy')}
-                />
-                <Button
-                  label="Help, FAQ & legal"
-                  variant="secondary"
-                  onPress={() => router.push('/help-legal')}
-                />
-              </View>
-              <Button label="Log out" variant="secondary" onPress={() => signOut()} />
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      {isGuest ? (
+        <Button
+          label="Create an account"
+          onPress={() => {
+            exitGuestMode();
+            router.replace('/sign-up');
+          }}
+        />
+      ) : (
+        <>
+          <SectionCard title="General">
+            <View style={{ gap: Space[3] }}>
+              <Button
+                label="Subscription & plan"
+                variant="secondary"
+                onPress={() => router.push('/subscription')}
+              />
+              <Button label="Reports" variant="secondary" onPress={() => router.push('/reports')} />
+              <Button
+                label="Notifications"
+                variant="secondary"
+                onPress={() => router.push('/notification-settings')}
+              />
+              <Button
+                label="Manage categories"
+                variant="secondary"
+                onPress={() => router.push('/manage-categories')}
+              />
+              <Button
+                label="Security"
+                variant="secondary"
+                onPress={() => router.push('/security')}
+              />
+              <Button
+                label="Data & privacy"
+                variant="secondary"
+                onPress={() => router.push('/data-privacy')}
+              />
+              <Button
+                label="Help, FAQ & legal"
+                variant="secondary"
+                onPress={() => router.push('/help-legal')}
+              />
+            </View>
+          </SectionCard>
+          <Button label="Log out" variant="quiet" onPress={() => signOut()} />
+        </>
+      )}
+    </Screen>
   );
 }

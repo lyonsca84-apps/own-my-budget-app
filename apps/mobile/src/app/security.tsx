@@ -1,14 +1,11 @@
 import { useState } from 'react';
-import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
-import { Spacing } from '@/constants/theme';
 
 /**
  * Face ID / passcode app-lock (PLAN.md screen #68) is deliberately not
@@ -41,36 +38,25 @@ export default function SecurityScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Security
-          </ThemedText>
-
-          <Card style={{ gap: Spacing.two }}>
-            <ThemedText type="smallBold">Change password</ThemedText>
-            <TextField
-              label="New password"
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-            />
-            {statusMessage ? (
-              <ThemedText type="small" themeColor={isError ? 'danger' : 'success'}>
-                {statusMessage}
-              </ThemedText>
-            ) : null}
-            <Button
-              label={isSubmitting ? 'Saving…' : 'Update password'}
-              onPress={handleSubmit}
-              disabled={isSubmitting || newPassword.length < 6}
-            />
-          </Card>
-        </View>
-      </SafeAreaView>
-    </ThemedView>
+    <Screen>
+      <SectionCard title="Change password">
+        <TextField
+          label="New password"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          textContentType="newPassword"
+        />
+        {statusMessage ? (
+          <ThemedText themeColor={isError ? 'danger' : 'success'}>{statusMessage}</ThemedText>
+        ) : null}
+        <Button
+          label={isSubmitting ? 'Saving…' : 'Update password'}
+          onPress={handleSubmit}
+          disabled={isSubmitting || newPassword.length < 6}
+        />
+      </SectionCard>
+    </Screen>
   );
 }

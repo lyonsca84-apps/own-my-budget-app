@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatLocalDate } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import {
@@ -15,7 +13,6 @@ import {
   exportLedgerToCsv,
   saveAndShareFile,
 } from '@/lib/export-data';
-import { Spacing } from '@/constants/theme';
 
 export default function ExportDataScreen() {
   const { user } = useAuth();
@@ -52,46 +49,32 @@ export default function ExportDataScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Export your data
-          </ThemedText>
+    <Screen>
+      <SectionCard title="Full data (JSON)">
+        <ThemedText themeColor="textSecondary">
+          Everything: bills, debts, savings goals, categories, paychecks, and payment history.
+        </ThemedText>
+        <Button
+          label={isExporting === 'json' ? 'Exporting…' : 'Export JSON'}
+          onPress={() => handleExport('json')}
+          disabled={isExporting !== null}
+        />
+      </SectionCard>
 
-          <Card style={{ gap: Spacing.two }}>
-            <ThemedText type="smallBold">Full data (JSON)</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Everything: bills, debts, savings goals, categories, paychecks, and payment history.
-            </ThemedText>
-            <Button
-              label={isExporting === 'json' ? 'Exporting…' : 'Export JSON'}
-              onPress={() => handleExport('json')}
-              disabled={isExporting !== null}
-            />
-          </Card>
+      <SectionCard title="Spending & savings ledger (CSV)">
+        <ThemedText themeColor="textSecondary">
+          Every bill payment, debt payment, and goal deposit/withdrawal, one row each, sorted by
+          date.
+        </ThemedText>
+        <Button
+          label={isExporting === 'csv' ? 'Exporting…' : 'Export CSV'}
+          variant="secondary"
+          onPress={() => handleExport('csv')}
+          disabled={isExporting !== null}
+        />
+      </SectionCard>
 
-          <Card style={{ gap: Spacing.two }}>
-            <ThemedText type="smallBold">Spending &amp; savings ledger (CSV)</ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Every bill payment, debt payment, and goal deposit/withdrawal, one row each, sorted by
-              date.
-            </ThemedText>
-            <Button
-              label={isExporting === 'csv' ? 'Exporting…' : 'Export CSV'}
-              variant="secondary"
-              onPress={() => handleExport('csv')}
-              disabled={isExporting !== null}
-            />
-          </Card>
-
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
-        </View>
-      </SafeAreaView>
-    </ThemedView>
+      {errorMessage ? <ThemedText themeColor="danger">{errorMessage}</ThemedText> : null}
+    </Screen>
   );
 }

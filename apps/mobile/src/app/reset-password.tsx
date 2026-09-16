@@ -38,9 +38,7 @@ export default function ResetPasswordScreen() {
           style={{ flex: 1, justifyContent: 'center', padding: Spacing.five, gap: Spacing.four }}
         >
           <View>
-            <ThemedText type="title" style={{ fontSize: 24 }}>
-              Set a new password
-            </ThemedText>
+            <ThemedText type="subtitle">Set a new password</ThemedText>
             <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.one }}>
               Choose a new password for your account.
             </ThemedText>
@@ -62,6 +60,7 @@ export default function ResetPasswordScreen() {
             ) : null}
             <Button
               label={isSubmitting ? 'Saving…' : 'Save new password'}
+              variant="panel"
               onPress={handleSubmit}
               disabled={isSubmitting || newPassword.length < 6}
             />

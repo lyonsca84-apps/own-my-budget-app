@@ -1,18 +1,18 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { saveReceipt, type ReceiptExtraction } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SubsectionHeader } from '@/components/ui/subsection-header';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { scanHandoff } from '@/lib/scan-handoff';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 interface EditableItem {
   label: string;
@@ -100,96 +100,84 @@ export default function ReviewReceiptScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Review &amp; correct
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            Nothing saves until you confirm. Fix anything the scan got wrong.
-          </ThemedText>
+    <Screen>
+      <ThemedText themeColor="textSecondary">
+        Nothing saves until you confirm. Fix anything the scan got wrong.
+      </ThemedText>
 
-          <TextField label="Store" value={storeLabel} onChangeText={setStoreLabel} />
-          <TextField
-            label="Date (YYYY-MM-DD)"
-            value={purchasedOn}
-            onChangeText={setPurchasedOn}
-            placeholder="YYYY-MM-DD"
-          />
+      <TextField label="Store" value={storeLabel} onChangeText={setStoreLabel} />
+      <TextField
+        label="Date (YYYY-MM-DD)"
+        value={purchasedOn}
+        onChangeText={setPurchasedOn}
+        placeholder="YYYY-MM-DD"
+      />
 
-          <ThemedText type="smallBold">Items</ThemedText>
-          {items.length === 0 ? (
-            <ThemedText themeColor="textSecondary">No items were detected.</ThemedText>
-          ) : (
-            items.map((item, index) =>
-              item.removed ? null : (
-                <Card key={index} style={{ gap: Spacing.two }}>
+      <SubsectionHeader title="Items" />
+      {items.length === 0 ? (
+        <ThemedText themeColor="textSecondary">No items were detected.</ThemedText>
+      ) : (
+        items.map((item, index) =>
+          item.removed ? null : (
+            <Card key={index} style={{ gap: Space[2] }}>
+              <TextField
+                label="Item"
+                value={item.label}
+                onChangeText={(value) => updateItem(index, { label: value })}
+              />
+              <TextField
+                label="Category"
+                value={item.category}
+                onChangeText={(value) => updateItem(index, { category: value })}
+              />
+              <View style={{ flexDirection: 'row', gap: Space[2] }}>
+                <View style={{ flex: 1 }}>
                   <TextField
-                    label="Item"
-                    value={item.label}
-                    onChangeText={(value) => updateItem(index, { label: value })}
+                    label="Price"
+                    value={item.price}
+                    onChangeText={(value) => updateItem(index, { price: value })}
+                    keyboardType="decimal-pad"
                   />
+                </View>
+                <View style={{ flex: 1 }}>
                   <TextField
-                    label="Category"
-                    value={item.category}
-                    onChangeText={(value) => updateItem(index, { category: value })}
+                    label="Qty"
+                    value={item.quantity}
+                    onChangeText={(value) => updateItem(index, { quantity: value })}
+                    keyboardType="decimal-pad"
                   />
-                  <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <View style={{ flex: 1 }}>
-                      <TextField
-                        label="Price"
-                        value={item.price}
-                        onChangeText={(value) => updateItem(index, { price: value })}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <TextField
-                        label="Qty"
-                        value={item.quantity}
-                        onChangeText={(value) => updateItem(index, { quantity: value })}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
-                  <Button
-                    label="Remove item"
-                    variant="secondary"
-                    onPress={() => updateItem(index, { removed: true })}
-                  />
-                </Card>
-              )
-            )
-          )}
+                </View>
+              </View>
+              <Button
+                label="Remove item"
+                variant="secondary"
+                onPress={() => updateItem(index, { removed: true })}
+              />
+            </Card>
+          )
+        )
+      )}
 
-          <TextField
-            label="Subtotal"
-            value={subtotal}
-            onChangeText={setSubtotal}
-            keyboardType="decimal-pad"
-          />
-          <TextField label="Tax" value={tax} onChangeText={setTax} keyboardType="decimal-pad" />
-          <TextField
-            label="Total"
-            value={total}
-            onChangeText={setTotal}
-            keyboardType="decimal-pad"
-          />
+      <TextField
+        label="Subtotal"
+        value={subtotal}
+        onChangeText={setSubtotal}
+        keyboardType="decimal-pad"
+      />
+      <TextField label="Tax" value={tax} onChangeText={setTax} keyboardType="decimal-pad" />
+      <TextField label="Total" value={total} onChangeText={setTotal} keyboardType="decimal-pad" />
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
 
-          <Button
-            label={isSaving ? 'Saving…' : 'Confirm & save'}
-            onPress={handleConfirmAndSave}
-            disabled={isSaving}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      <Button
+        label={isSaving ? 'Saving…' : 'Confirm & save'}
+        onPress={handleConfirmAndSave}
+        disabled={isSaving}
+      />
+    </Screen>
   );
 }

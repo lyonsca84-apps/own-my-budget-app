@@ -1,7 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import {
   getOrCreateBudgetPeriod,
   getPaycheck,
@@ -13,8 +12,8 @@ import {
 import { assignPaycheck, formatCents, formatLocalDate, parseLocalDate } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -53,11 +52,9 @@ export default function AssignPaycheckScreen() {
 
   if (!paycheck) {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1, padding: Spacing.five }}>
-          <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-        </SafeAreaView>
-      </ThemedView>
+      <Screen scroll={false} center>
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      </Screen>
     );
   }
 
@@ -100,61 +97,53 @@ export default function AssignPaycheckScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.five, gap: Spacing.four }}>
-          <View>
-            <ThemedText type="title" style={{ fontSize: 22 }}>
-              Assign this paycheck
-            </ThemedText>
-            <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.one }}>
-              {formatCents(paycheck.amount_cents)} received {paycheck.pay_date}
-            </ThemedText>
-          </View>
+    <Screen>
+      <ThemedText themeColor="textSecondary">
+        {formatCents(paycheck.amount_cents)} received {paycheck.pay_date}
+      </ThemedText>
 
-          {categories.length === 0 ? (
-            <ThemedText themeColor="textSecondary">
-              Add a category first (from the Plan tab) before assigning a paycheck.
-            </ThemedText>
-          ) : (
-            <View style={{ gap: Spacing.three }}>
-              {categories.map((category) => (
-                <TextField
-                  key={category.id}
-                  label={category.name}
-                  value={amounts[category.id] ?? ''}
-                  onChangeText={(text) => setAmounts((prev) => ({ ...prev, [category.id]: text }))}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
-                />
-              ))}
-            </View>
-          )}
+      {categories.length === 0 ? (
+        <ThemedText themeColor="textSecondary">
+          Add a category first (from the Plan tab) before assigning a paycheck.
+        </ThemedText>
+      ) : (
+        <View style={{ gap: Spacing.three }}>
+          {categories.map((category) => (
+            <TextField
+              key={category.id}
+              label={category.name}
+              value={amounts[category.id] ?? ''}
+              onChangeText={(text) => setAmounts((prev) => ({ ...prev, [category.id]: text }))}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+            />
+          ))}
+        </View>
+      )}
 
-          <View style={{ gap: Spacing.one }}>
-            <ThemedText type="smallBold">
-              Remaining to assign: {formatCents(result.remainingCents)}
-            </ThemedText>
-            {result.isOverAllocated && (
-              <ThemedText type="small" themeColor="danger">
-                You&apos;ve allocated more than this paycheck.
-              </ThemedText>
-            )}
-          </View>
+      <View style={{ gap: Spacing.one }}>
+        <ThemedText type="smallBold">
+          Remaining to assign: {formatCents(result.remainingCents)}
+        </ThemedText>
+        {result.isOverAllocated && (
+          <ThemedText type="small" themeColor="danger">
+            You&apos;ve allocated more than this paycheck.
+          </ThemedText>
+        )}
+      </View>
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
 
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save assignment'}
-            onPress={handleSave}
-            disabled={isSubmitting || categories.length === 0 || result.isOverAllocated}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      <Button
+        variant="panel"
+        label={isSubmitting ? 'Saving…' : 'Save assignment'}
+        onPress={handleSave}
+        disabled={isSubmitting || categories.length === 0 || result.isOverAllocated}
+      />
+    </Screen>
   );
 }

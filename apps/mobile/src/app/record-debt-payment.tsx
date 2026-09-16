@@ -1,15 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { recordDebtPayment } from '@own-my-budget/api';
 import { formatLocalDate } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function RecordDebtPaymentScreen() {
@@ -39,40 +36,33 @@ export default function RecordDebtPaymentScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Record a payment
-          </ThemedText>
+    <Screen>
+      <TextField
+        label="Amount"
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="0.00"
+        keyboardType="decimal-pad"
+      />
+      <TextField
+        label="Date paid"
+        value={paidOn}
+        onChangeText={setPaidOn}
+        placeholder="YYYY-MM-DD"
+      />
 
-          <TextField
-            label="Amount"
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-          <TextField
-            label="Date paid"
-            value={paidOn}
-            onChangeText={setPaidOn}
-            placeholder="YYYY-MM-DD"
-          />
+      {errorMessage ? (
+        <ThemedText type="small" themeColor="danger">
+          {errorMessage}
+        </ThemedText>
+      ) : null}
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save payment'}
-            onPress={handleSave}
-            disabled={isSubmitting || !amount.trim()}
-          />
-        </View>
-      </SafeAreaView>
-    </ThemedView>
+      <Button
+        variant="panel"
+        label={isSubmitting ? 'Saving…' : 'Save payment'}
+        onPress={handleSave}
+        disabled={isSubmitting || !amount.trim()}
+      />
+    </Screen>
   );
 }
