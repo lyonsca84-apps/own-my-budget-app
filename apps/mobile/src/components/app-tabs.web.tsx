@@ -1,17 +1,40 @@
 import type { ComponentProps, PropsWithChildren } from 'react';
+import { useEffect, useState } from 'react';
 import { router, type Href } from 'expo-router';
 import { Image } from 'expo-image';
 import { Tabs, TabList, TabTrigger, TabSlot, type TabTriggerSlotProps } from 'expo-router/ui';
 import { Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { getCurrentAccount } from '@own-my-budget/api';
+import { PLAN_PRICING, type PlanTier } from '@own-my-budget/core';
 
 import { Avatar } from '@/components/ui/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
+import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS, WIDE_EXTRA_LINKS } from '@/constants/nav';
 import { Fonts, Layout, MaxContentWidth, Spacing } from '@/constants/theme';
 import { BrandAssets } from '@/design-system/assets/brand';
 import { useTheme } from '@/hooks/use-theme';
+
+/** Fetches the signed-in user's plan tier — `null` for guests (no real entitlement to check) or while loading. */
+function usePlanTier(): PlanTier | null {
+  const { status, user } = useAuth();
+  const [plan, setPlan] = useState<PlanTier | null>(null);
+
+  useEffect(() => {
+    if (status !== 'signedIn' || !user) return;
+    let isMounted = true;
+    getCurrentAccount(supabase, user.id).then((account) => {
+      if (isMounted) setPlan(account.entitlement.plan_tier as PlanTier);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [status, user]);
+
+  return plan;
+}
 
 /** Below this width, the sidebar collapses into a bottom tab bar (mobile web). */
 const SIDEBAR_BREAKPOINT = 900;
@@ -45,7 +68,7 @@ export default function AppTabs() {
       </TabList>
       <View style={{ flex: 1, minHeight: 0 }}>
         <TabSlot style={{ flex: 1 }} />
-        {!isWide && <FloatingHelperButton />}
+        <FloatingHelperButton />
       </View>
     </Tabs>
   );
@@ -87,21 +110,13 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
       }
     >
       {isWide && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: Spacing.two,
-            paddingHorizontal: Spacing.two,
-          }}
-        >
+        <View style={{ alignItems: 'flex-start', paddingHorizontal: Spacing.two }}>
           <Image
-            source={BrandAssets.mascotTransparent}
+            source={BrandAssets.horizontalLockup}
             contentFit="contain"
-            style={{ width: 44, height: 44 }}
-            accessibilityLabel="Own My Budget mascot"
+            style={{ width: 190, height: 88 }}
+            accessibilityLabel="Own My Budget"
           />
-          <ThemedText type="subtitle">Own My Budget</ThemedText>
         </View>
       )}
 
@@ -166,9 +181,12 @@ function AccountSummary() {
 }
 
 /** Doubles as the sidebar's persistent entry point to the AI Helper (per the
- * approved design, Helper isn't a standard nav item on either layout). */
+ * approved design, Helper isn't a standard nav item on either layout). The
+ * trial pitch only shows for accounts that aren't already on Budget Buddy. */
 function BudgetBuddyUpsellCard() {
   const theme = useTheme();
+  const plan = usePlanTier();
+  const isBudgetBuddy = plan === 'budgetBuddy';
 
   return (
     <Pressable
@@ -186,7 +204,9 @@ function BudgetBuddyUpsellCard() {
         Meet Budget Buddy
       </ThemedText>
       <ThemedText type="small" themeColor="onPrimary" style={{ opacity: 0.9 }}>
-        Your AI assistant for bills, receipts, and getting ahead.
+        {isBudgetBuddy
+          ? 'Your AI assistant for bills, receipts, and getting ahead.'
+          : `Try it free for ${PLAN_PRICING.budgetBuddy.trialDays} days — your AI assistant for bills, receipts, and getting ahead.`}
       </ThemedText>
     </Pressable>
   );

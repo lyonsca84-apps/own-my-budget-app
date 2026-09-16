@@ -48,6 +48,7 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'settings', title: 'Settings' },
   { name: 'add-category', title: 'Add category' },
   { name: 'add-income', title: 'Add income' },
+  { name: 'add-transaction', title: 'Add transaction' },
   { name: 'add-paycheck', title: 'Log a paycheck' },
   { name: 'assign-paycheck', title: 'Assign paycheck' },
   { name: 'add-bill', title: 'Add bill' },

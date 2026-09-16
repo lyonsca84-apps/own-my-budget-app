@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  getCurrentAccount,
   listAccounts,
+  listBillPaymentsForReports,
   listBillsWithPayments,
+  listDebtPaymentsForReports,
   listDebtsWithPayments,
   listPaychecks,
   listSavingsGoals,
@@ -16,6 +19,7 @@ import {
   calculateMoneyLeftToSpend,
   calculateSavingsProgress,
   deriveBillStatus,
+  formatLocalDate,
   sumDebtBalances,
   sumSavingsSaved,
   type BudgetHealthResult,
@@ -35,6 +39,13 @@ export interface DashboardBill {
   status: BillStatus;
 }
 
+export interface DashboardCashFlow {
+  month: number; // 0-11
+  year: number;
+  incomeCents: number;
+  spendingCents: number;
+}
+
 export interface DashboardData {
   displayName: string;
   balanceCents: number;
@@ -42,9 +53,17 @@ export interface DashboardData {
   savingsTotalCents: number;
   debtTotalCents: number;
   moneyLeftToSpendCents: number;
+  billsPaidCount: number;
+  billsTotalCount: number;
   nextPaycheck: { label: string; amountCents: number; payDate: string } | null;
   billsNeedingAttention: DashboardBill[];
   budgetHealth: BudgetHealthResult;
+  cashFlow: DashboardCashFlow;
+  selectedMonth: number;
+  selectedYear: number;
+  setSelectedMonth: (month: number) => void;
+  setSelectedYear: (year: number) => void;
+  refresh: () => void;
   /** True only for a real signed-in user who hasn't added anything yet — distinct from guest, which always has demo data. */
   hasNoData: boolean;
   isLoading: boolean;
@@ -108,7 +127,21 @@ function averageSavingsProgressDemo(goals: DemoSavingsGoal[]): number | null {
   return total / goals.length;
 }
 
-function buildGuestData(): DashboardData {
+function monthRange(year: number, month: number): { fromDate: string; toDate: string } {
+  return {
+    fromDate: formatLocalDate(new Date(year, month, 1)),
+    toDate: formatLocalDate(new Date(year, month + 1, 0)),
+  };
+}
+
+const EMPTY_CASH_FLOW = (month: number, year: number): DashboardCashFlow => ({
+  month,
+  year,
+  incomeCents: 0,
+  spendingCents: 0,
+});
+
+function buildGuestData(month: number, year: number): DashboardData {
   const { profile, account, incomeSources, bills, debts, savingsGoals } = DEMO_DATA;
   // Demo bills are a fixed, hand-authored snapshot (see demoData.ts) — their
   // `status` is already correct for the scenario, no need to re-derive it
@@ -136,6 +169,7 @@ function buildGuestData(): DashboardData {
     balanceCents: account.balanceCents,
     unpaidBillsCents,
   }).totalCents;
+  const demoIncomeCents = incomeSources.reduce((sum, s) => sum + s.amountCents, 0);
 
   return {
     displayName: profile.displayName,
@@ -144,6 +178,8 @@ function buildGuestData(): DashboardData {
     savingsTotalCents,
     debtTotalCents,
     moneyLeftToSpendCents,
+    billsPaidCount: derivedBills.filter((b) => b.status === 'paid').length,
+    billsTotalCount: derivedBills.length,
     nextPaycheck,
     billsNeedingAttention: derivedBills
       .filter((b) => b.status !== 'paid')
@@ -159,6 +195,12 @@ function buildGuestData(): DashboardData {
       averageCreditUtilizationPercent: averageCreditUtilizationDemo(debts),
       averageSavingsGoalPercent: averageSavingsProgressDemo(savingsGoals),
     }),
+    cashFlow: { month, year, incomeCents: demoIncomeCents, spendingCents: unpaidBillsCents },
+    selectedMonth: month,
+    selectedYear: year,
+    setSelectedMonth: () => {},
+    setSelectedYear: () => {},
+    refresh: () => {},
     hasNoData: false,
     isLoading: false,
   };
@@ -173,15 +215,32 @@ const LOADING_HEALTH: BudgetHealthResult = {
 
 export function useDashboardData(): DashboardData {
   const { status, user } = useAuth();
-  const [realData, setRealData] = useState<DashboardData | null>(null);
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [realData, setRealData] = useState<Omit<
+    DashboardData,
+    | 'cashFlow'
+    | 'selectedMonth'
+    | 'selectedYear'
+    | 'setSelectedMonth'
+    | 'setSelectedYear'
+    | 'refresh'
+  > | null>(null);
+  const [cashFlow, setCashFlow] = useState<DashboardCashFlow>(
+    EMPTY_CASH_FLOW(selectedMonth, selectedYear)
+  );
+  const [paychecksForIncome, setPaychecksForIncome] = useState<Tables<'paychecks'>[]>([]);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (status !== 'signedIn' || !user) return;
     let isMounted = true;
 
     async function load() {
-      const today = new Date();
-      const [accounts, bills, paychecks, debts, goals] = await Promise.all([
+      const now = new Date();
+      const [account, accounts, bills, paychecks, debts, goals] = await Promise.all([
+        getCurrentAccount(supabase, user!.id),
         listAccounts(supabase, user!.id),
         listBillsWithPayments(supabase, user!.id),
         listPaychecks(supabase, user!.id),
@@ -191,7 +250,7 @@ export function useDashboardData(): DashboardData {
       if (!isMounted) return;
 
       const balanceCents = accounts.reduce((sum, a) => sum + a.balance_cents, 0);
-      const derivedBills = bills.map((b) => billFromReal(b, today));
+      const derivedBills = bills.map((b) => billFromReal(b, now));
       const unpaidBillsCents = derivedBills
         .filter((b) => b.status !== 'paid')
         .reduce((sum, b) => sum + b.amountCents, 0);
@@ -203,13 +262,16 @@ export function useDashboardData(): DashboardData {
         unpaidBillsCents,
       }).totalCents;
 
+      setPaychecksForIncome(paychecks);
       setRealData({
-        displayName: user!.email?.split('@')[0] ?? 'there',
+        displayName: account.profile.display_name?.trim() || 'there',
         balanceCents,
         unpaidBillsCents,
         savingsTotalCents,
         debtTotalCents,
         moneyLeftToSpendCents,
+        billsPaidCount: derivedBills.filter((b) => b.status === 'paid').length,
+        billsTotalCount: derivedBills.length,
         nextPaycheck: latestPaycheck
           ? {
               label: 'Paycheck',
@@ -245,28 +307,72 @@ export function useDashboardData(): DashboardData {
     return () => {
       isMounted = false;
     };
-  }, [status, user]);
+  }, [status, user, reloadTick]);
 
-  if (status === 'guest') return buildGuestData();
+  // Spending-this-month comes from a targeted, date-ranged query (the base
+  // load above only fetches lifetime payment totals per bill/debt) — kept in
+  // its own effect so switching months doesn't re-fetch everything else.
+  useEffect(() => {
+    if (status !== 'signedIn' || !user) return;
+    let isMounted = true;
+    const range = monthRange(selectedYear, selectedMonth);
+
+    async function loadCashFlow() {
+      const [billPayments, debtPayments] = await Promise.all([
+        listBillPaymentsForReports(supabase, user!.id, range),
+        listDebtPaymentsForReports(supabase, user!.id, range),
+      ]);
+      if (!isMounted) return;
+      const spendingCents =
+        billPayments.reduce((sum, p) => sum + p.amount_cents, 0) +
+        debtPayments.reduce((sum, p) => sum + p.amount_cents, 0);
+      const incomeCents = paychecksForIncome
+        .filter((p) => p.pay_date >= range.fromDate && p.pay_date <= range.toDate)
+        .reduce((sum, p) => sum + p.amount_cents, 0);
+      setCashFlow({ month: selectedMonth, year: selectedYear, incomeCents, spendingCents });
+    }
+
+    loadCashFlow();
+    return () => {
+      isMounted = false;
+    };
+  }, [status, user, selectedMonth, selectedYear, paychecksForIncome]);
+
+  const guestData = useMemo(
+    () => buildGuestData(selectedMonth, selectedYear),
+    [selectedMonth, selectedYear]
+  );
+
+  if (status === 'guest') return guestData;
+
   if (status === 'signedIn') {
-    return (
-      realData ?? {
+    return {
+      ...(realData ?? {
         displayName: '',
         balanceCents: 0,
         unpaidBillsCents: 0,
         savingsTotalCents: 0,
         debtTotalCents: 0,
         moneyLeftToSpendCents: 0,
+        billsPaidCount: 0,
+        billsTotalCount: 0,
         nextPaycheck: null,
         billsNeedingAttention: [],
         budgetHealth: LOADING_HEALTH,
         hasNoData: false,
         isLoading: true,
-      }
-    );
+      }),
+      cashFlow,
+      selectedMonth,
+      selectedYear,
+      setSelectedMonth,
+      setSelectedYear,
+      refresh: () => setReloadTick((n) => n + 1),
+    };
   }
+
   // loading/signedOut/passwordRecovery never render this screen, but keep the hook total.
-  return buildGuestData();
+  return guestData;
 }
 
 function sumDebtTotals(debts: DebtWithPayments[]): number {
