@@ -6,6 +6,9 @@ import {
   assignPaycheck,
   calculateIncomeTotal,
   calculateExpenseTotal,
+  generatePaydays,
+  buildBudgetRows,
+  summarizeBudget,
 } from '../budgeting';
 
 describe('deriveBillStatus', () => {
@@ -174,5 +177,134 @@ describe('calculateIncomeTotal / calculateExpenseTotal', () => {
   it('returns zero for an empty list', () => {
     expect(calculateIncomeTotal([])).toBe(0);
     expect(calculateExpenseTotal([])).toBe(0);
+  });
+});
+
+describe('generatePaydays', () => {
+  const from = new Date(2026, 8, 20); // Sep 20, 2026
+
+  it('rolls a past biweekly anchor forward to the next upcoming payday', () => {
+    expect(generatePaydays('biweekly', '2026-09-04', 3, from)).toEqual([
+      '2026-10-02',
+      '2026-10-16',
+      '2026-10-30',
+    ]);
+  });
+
+  it('includes the from date itself when it lands on a payday', () => {
+    expect(generatePaydays('weekly', '2026-09-06', 2, from)).toEqual(['2026-09-20', '2026-09-27']);
+  });
+
+  it('starts at a future anchor', () => {
+    expect(generatePaydays('biweekly', '2026-09-25', 2, from)).toEqual([
+      '2026-09-25',
+      '2026-10-09',
+    ]);
+  });
+
+  it('projects monthly paydays, clamping to short months', () => {
+    expect(generatePaydays('monthly', '2026-01-31', 3, from)).toEqual([
+      '2026-09-30',
+      '2026-10-31',
+      '2026-11-30',
+    ]);
+  });
+
+  it('projects twice-monthly paydays 15 days apart within a month', () => {
+    expect(generatePaydays('twice_monthly', '2026-09-01', 4, from)).toEqual([
+      '2026-10-01',
+      '2026-10-16',
+      '2026-11-01',
+      '2026-11-16',
+    ]);
+  });
+
+  it('returns only the stated date for a variable schedule, and only if upcoming', () => {
+    expect(generatePaydays('variable', '2026-10-05', 3, from)).toEqual(['2026-10-05']);
+    expect(generatePaydays('variable', '2026-09-01', 3, from)).toEqual([]);
+  });
+
+  it('returns nothing without an anchor date or a positive count', () => {
+    expect(generatePaydays('biweekly', null, 3, from)).toEqual([]);
+    expect(generatePaydays('biweekly', '2026-09-25', 0, from)).toEqual([]);
+  });
+});
+
+describe('buildBudgetRows / summarizeBudget', () => {
+  const categories = [
+    { id: 'rent', name: 'Rent' },
+    { id: 'food', name: 'Groceries' },
+    { id: 'fun', name: 'Fun' },
+    { id: 'misc', name: 'Misc' },
+  ];
+
+  it('derives planned, actual, remaining, percent and state per category', () => {
+    const rows = buildBudgetRows(
+      categories,
+      [
+        { categoryId: 'rent', plannedCents: 100_000, actualOverrideCents: null },
+        { categoryId: 'food', plannedCents: 50_000, actualOverrideCents: null },
+        { categoryId: 'fun', plannedCents: 10_000, actualOverrideCents: null },
+      ],
+      [
+        { categoryId: 'rent', amountCents: 50_000 },
+        { categoryId: 'food', amountCents: 45_000 },
+        { categoryId: 'food', amountCents: 10_000 },
+        { categoryId: 'fun', amountCents: 9_000 },
+        { categoryId: 'misc', amountCents: 2_000 },
+        { categoryId: null, amountCents: 999 },
+      ]
+    );
+    expect(rows.map((r) => [r.name, r.actualCents, r.state, r.percentUsed])).toEqual([
+      ['Rent', 50_000, 'on-track', 50],
+      ['Groceries', 55_000, 'over', 110],
+      ['Fun', 9_000, 'near', 90],
+      ['Misc', 2_000, 'unplanned', null],
+    ]);
+    expect(rows[1].overCents).toBe(5_000);
+    expect(rows[1].remainingCents).toBe(-5_000);
+    expect(rows[0].overCents).toBe(0);
+  });
+
+  it('lets an override replace the tracked amount, including a zero override', () => {
+    const rows = buildBudgetRows(
+      categories.slice(0, 2),
+      [
+        { categoryId: 'rent', plannedCents: 100_000, actualOverrideCents: 0 },
+        { categoryId: 'food', plannedCents: 50_000, actualOverrideCents: 20_000 },
+      ],
+      [
+        { categoryId: 'rent', amountCents: 100_000 },
+        { categoryId: 'food', amountCents: 45_000 },
+      ]
+    );
+    expect(rows[0]).toMatchObject({ actualCents: 0, trackedCents: 100_000, isOverridden: true });
+    expect(rows[1]).toMatchObject({
+      actualCents: 20_000,
+      trackedCents: 45_000,
+      isOverridden: true,
+    });
+  });
+
+  it('summarizes the whole period', () => {
+    const rows = buildBudgetRows(
+      categories.slice(0, 2),
+      [
+        { categoryId: 'rent', plannedCents: 100_000, actualOverrideCents: null },
+        { categoryId: 'food', plannedCents: 50_000, actualOverrideCents: null },
+      ],
+      [
+        { categoryId: 'rent', amountCents: 100_000 },
+        { categoryId: 'food', amountCents: 60_000 },
+      ]
+    );
+    expect(summarizeBudget(rows)).toEqual({
+      plannedCents: 150_000,
+      actualCents: 160_000,
+      remainingCents: -10_000,
+      overCategoryCount: 1,
+      percentUsed: 107,
+    });
+    expect(summarizeBudget([]).percentUsed).toBeNull();
   });
 });

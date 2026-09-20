@@ -104,7 +104,7 @@ export default function AssignPaycheckScreen() {
 
       {categories.length === 0 ? (
         <ThemedText themeColor="textSecondary">
-          Add a category first (from the Plan tab) before assigning a paycheck.
+          Add a category first (from the Budget tab) before assigning a paycheck.
         </ThemedText>
       ) : (
         <View style={{ gap: Spacing.three }}>
@@ -126,7 +126,7 @@ export default function AssignPaycheckScreen() {
           Remaining to assign: {formatCents(result.remainingCents)}
         </ThemedText>
         {result.isOverAllocated && (
-          <ThemedText type="small" themeColor="danger">
+          <ThemedText type="small" themeColor="warning">
             You&apos;ve allocated more than this paycheck.
           </ThemedText>
         )}

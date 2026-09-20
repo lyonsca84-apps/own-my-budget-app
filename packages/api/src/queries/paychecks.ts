@@ -42,3 +42,44 @@ export async function markPaycheckAssigned(
     .eq('id', paycheckId);
   if (error) throw error;
 }
+
+/**
+ * Payday planning: which paycheck (identified by pay schedule + date) is
+ * meant to cover which bill, debt payment, or savings contribution.
+ * Planning never changes a balance — only recording a payment does.
+ */
+export type PaydayTargetType = 'bill' | 'debt' | 'savings_goal';
+
+export async function listPaydayAssignments(
+  client: TypedSupabaseClient,
+  userId: string
+): Promise<Tables<'payday_assignments'>[]> {
+  const { data, error } = await client
+    .from('payday_assignments')
+    .select('*')
+    .eq('user_id', userId)
+    .order('pay_date');
+  if (error) throw error;
+  return data;
+}
+
+export async function assignPaymentToPayday(
+  client: TypedSupabaseClient,
+  assignment: TablesInsert<'payday_assignments'>
+): Promise<Tables<'payday_assignments'>> {
+  const { data, error } = await client
+    .from('payday_assignments')
+    .upsert(assignment, { onConflict: 'income_source_id,pay_date,target_type,target_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function removePaydayAssignment(
+  client: TypedSupabaseClient,
+  assignmentId: string
+): Promise<void> {
+  const { error } = await client.from('payday_assignments').delete().eq('id', assignmentId);
+  if (error) throw error;
+}

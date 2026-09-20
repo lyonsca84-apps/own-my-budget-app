@@ -1,4 +1,5 @@
-import { parseLocalDate } from './dates';
+import { formatLocalDate, parseLocalDate } from './dates';
+import type { CategorizedAmount } from './reports';
 
 /**
  * Core budgeting math — pure, deterministic, framework-independent. Every
@@ -162,4 +163,184 @@ export function calculateIncomeTotal(entries: SignedAmountInput[]): number {
 /** Sum of negative (outflow) amounts, returned as a positive total. */
 export function calculateExpenseTotal(entries: SignedAmountInput[]): number {
   return entries.reduce((sum, e) => sum + Math.max(-e.amountCents, 0), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Budget view (planned vs. actual by category, and payday projection)
+// ---------------------------------------------------------------------------
+
+export type PayFrequency = 'weekly' | 'biweekly' | 'twice_monthly' | 'monthly' | 'variable';
+
+function daysInMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Projects the next `count` paydays (YYYY-MM-DD, ascending) of a pay
+ * schedule on or after `from`. `anchorDate` is the schedule's known pay date
+ * (income_sources.next_pay_date) — it can be in the past, in which case the
+ * schedule is rolled forward from it. Schedules with no anchor, and
+ * 'variable' schedules (which only ever have their one stated date), can't be
+ * projected further.
+ */
+export function generatePaydays(
+  frequency: PayFrequency,
+  anchorDate: string | null,
+  count: number,
+  from: Date
+): string[] {
+  if (!anchorDate || count <= 0) return [];
+  const anchor = parseLocalDate(anchorDate);
+  const floor = startOfDay(from);
+  const result: string[] = [];
+
+  if (frequency === 'variable') {
+    return anchor >= floor ? [formatLocalDate(anchor)] : [];
+  }
+
+  if (frequency === 'weekly' || frequency === 'biweekly') {
+    const stepDays = frequency === 'weekly' ? 7 : 14;
+    const cursor = new Date(anchor);
+    if (cursor < floor) {
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const daysBehind = Math.round((floor.getTime() - cursor.getTime()) / msPerDay);
+      cursor.setDate(cursor.getDate() + Math.floor(daysBehind / stepDays) * stepDays);
+      while (cursor < floor) cursor.setDate(cursor.getDate() + stepDays);
+    }
+    while (result.length < count) {
+      result.push(formatLocalDate(cursor));
+      cursor.setDate(cursor.getDate() + stepDays);
+    }
+    return result;
+  }
+
+  const lower = anchor > floor ? anchor : floor;
+  const anchorDay = anchor.getDate();
+  const daysOfMonth =
+    frequency === 'twice_monthly'
+      ? [anchorDay, anchorDay <= 15 ? anchorDay + 15 : anchorDay - 15].sort((a, b) => a - b)
+      : [anchorDay];
+
+  let year = lower.getFullYear();
+  let month = lower.getMonth();
+  // Bounded loop: at most 2 paydays per month, so `count` paydays fit well inside this.
+  for (let guard = 0; guard < count * 2 + 4 && result.length < count; guard++) {
+    const length = daysInMonth(year, month);
+    for (const day of daysOfMonth) {
+      const candidate = new Date(year, month, Math.min(day, length));
+      if (candidate >= lower && result.length < count) result.push(formatLocalDate(candidate));
+    }
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+  }
+  return result;
+}
+
+export type BudgetRowState = 'unplanned' | 'on-track' | 'near' | 'over';
+
+export interface BudgetLineInput {
+  categoryId: string;
+  plannedCents: number;
+  /** A user-typed replacement for the tracked amount; null = use the tracked amount. */
+  actualOverrideCents: number | null;
+}
+
+export interface BudgetCategoryRow {
+  categoryId: string;
+  name: string;
+  plannedCents: number;
+  /** Sum of what was actually recorded (payments/transactions) for this category and month. */
+  trackedCents: number;
+  /** What the row shows: the override if the user set one, otherwise the tracked amount. */
+  actualCents: number;
+  isOverridden: boolean;
+  /** Planned minus actual; negative when over. */
+  remainingCents: number;
+  overCents: number;
+  /** Rounded whole percent of plan used; null when nothing is planned. */
+  percentUsed: number | null;
+  state: BudgetRowState;
+}
+
+/** From this share of the plan used a row reads as "near" — a heads-up, not a warning. */
+export const BUDGET_NEAR_THRESHOLD_PERCENT = 85;
+
+/**
+ * Builds one planned-vs-actual row per category. `tracked` are positive
+ * spend amounts already filtered to the month (bill payments, outflow
+ * transactions); a categoryId that isn't in `categories` is ignored, since
+ * it can't be shown as a row.
+ */
+export function buildBudgetRows(
+  categories: { id: string; name: string }[],
+  lines: BudgetLineInput[],
+  tracked: CategorizedAmount[]
+): BudgetCategoryRow[] {
+  const lineByCategory = new Map(lines.map((l) => [l.categoryId, l]));
+  const trackedByCategory = new Map<string, number>();
+  for (const item of tracked) {
+    if (!item.categoryId) continue;
+    trackedByCategory.set(
+      item.categoryId,
+      (trackedByCategory.get(item.categoryId) ?? 0) + item.amountCents
+    );
+  }
+
+  return categories.map((category) => {
+    const line = lineByCategory.get(category.id);
+    const plannedCents = line?.plannedCents ?? 0;
+    const trackedCents = trackedByCategory.get(category.id) ?? 0;
+    const isOverridden = line?.actualOverrideCents != null;
+    const actualCents = isOverridden ? (line!.actualOverrideCents as number) : trackedCents;
+    const remainingCents = plannedCents - actualCents;
+    const percentUsed = plannedCents > 0 ? Math.round((actualCents / plannedCents) * 100) : null;
+
+    let state: BudgetRowState;
+    if (plannedCents <= 0) state = 'unplanned';
+    else if (actualCents > plannedCents) state = 'over';
+    else if ((percentUsed ?? 0) >= BUDGET_NEAR_THRESHOLD_PERCENT) state = 'near';
+    else state = 'on-track';
+
+    return {
+      categoryId: category.id,
+      name: category.name,
+      plannedCents,
+      trackedCents,
+      actualCents,
+      isOverridden,
+      remainingCents,
+      overCents: Math.max(-remainingCents, 0),
+      percentUsed,
+      state,
+    };
+  });
+}
+
+export interface BudgetSummary {
+  plannedCents: number;
+  actualCents: number;
+  /** Planned minus actual across the whole period; negative when over. */
+  remainingCents: number;
+  overCategoryCount: number;
+  /** Rounded whole percent of the total plan used; null when nothing is planned. */
+  percentUsed: number | null;
+}
+
+export function summarizeBudget(rows: BudgetCategoryRow[]): BudgetSummary {
+  const plannedCents = rows.reduce((sum, r) => sum + r.plannedCents, 0);
+  const actualCents = rows.reduce((sum, r) => sum + r.actualCents, 0);
+  return {
+    plannedCents,
+    actualCents,
+    remainingCents: plannedCents - actualCents,
+    overCategoryCount: rows.filter((r) => r.state === 'over').length,
+    percentUsed: plannedCents > 0 ? Math.round((actualCents / plannedCents) * 100) : null,
+  };
 }
