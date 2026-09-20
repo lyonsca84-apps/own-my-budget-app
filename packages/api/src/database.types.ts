@@ -170,6 +170,7 @@ export type Database = {
           reminder_days_before: number;
           updated_at: string;
           user_id: string;
+          reminder_enabled: boolean;
         };
         Insert: {
           amount_cents: number;
@@ -184,6 +185,7 @@ export type Database = {
           reminder_days_before?: number;
           updated_at?: string;
           user_id: string;
+          reminder_enabled?: boolean;
         };
         Update: {
           amount_cents?: number;
@@ -198,6 +200,7 @@ export type Database = {
           reminder_days_before?: number;
           updated_at?: string;
           user_id?: string;
+          reminder_enabled?: boolean;
         };
         Relationships: [
           {
@@ -218,6 +221,7 @@ export type Database = {
       };
       budget_lines: {
         Row: {
+          actual_override_cents: number | null;
           budget_period_id: string;
           category_id: string;
           created_at: string;
@@ -227,6 +231,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          actual_override_cents?: number | null;
           budget_period_id: string;
           category_id: string;
           created_at?: string;
@@ -236,6 +241,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          actual_override_cents?: number | null;
           budget_period_id?: string;
           category_id?: string;
           created_at?: string;
@@ -406,6 +412,20 @@ export type Database = {
           type: string;
           updated_at: string;
           user_id: string;
+          card_style: string | null;
+          card_text_mode: string;
+          issuer: string | null;
+          last4: string | null;
+          lender: string | null;
+          network: string | null;
+          notes: string | null;
+          original_balance_cents: number | null;
+          planned_payment_cents: number | null;
+          promo_apr_basis_points: number | null;
+          promo_balance_cents: number | null;
+          promo_expires_on: string | null;
+          started_on: string | null;
+          term_months: number | null;
         };
         Insert: {
           apr_basis_points?: number;
@@ -420,6 +440,20 @@ export type Database = {
           type?: string;
           updated_at?: string;
           user_id: string;
+          card_style?: string | null;
+          card_text_mode?: string;
+          issuer?: string | null;
+          last4?: string | null;
+          lender?: string | null;
+          network?: string | null;
+          notes?: string | null;
+          original_balance_cents?: number | null;
+          planned_payment_cents?: number | null;
+          promo_apr_basis_points?: number | null;
+          promo_balance_cents?: number | null;
+          promo_expires_on?: string | null;
+          started_on?: string | null;
+          term_months?: number | null;
         };
         Update: {
           apr_basis_points?: number;
@@ -434,6 +468,20 @@ export type Database = {
           type?: string;
           updated_at?: string;
           user_id?: string;
+          card_style?: string | null;
+          card_text_mode?: string;
+          issuer?: string | null;
+          last4?: string | null;
+          lender?: string | null;
+          network?: string | null;
+          notes?: string | null;
+          original_balance_cents?: number | null;
+          planned_payment_cents?: number | null;
+          promo_apr_basis_points?: number | null;
+          promo_balance_cents?: number | null;
+          promo_expires_on?: string | null;
+          started_on?: string | null;
+          term_months?: number | null;
         };
         Relationships: [
           {
@@ -921,6 +969,57 @@ export type Database = {
           },
         ];
       };
+      payday_assignments: {
+        Row: {
+          amount_cents: number;
+          created_at: string;
+          id: string;
+          income_source_id: string;
+          pay_date: string;
+          target_id: string;
+          target_type: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_cents: number;
+          created_at?: string;
+          id?: string;
+          income_source_id: string;
+          pay_date: string;
+          target_id: string;
+          target_type: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          amount_cents?: number;
+          created_at?: string;
+          id?: string;
+          income_source_id?: string;
+          pay_date?: string;
+          target_id?: string;
+          target_type?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payday_assignments_income_source_id_fkey';
+            columns: ['income_source_id'];
+            isOneToOne: false;
+            referencedRelation: 'income_sources';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payday_assignments_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       payoff_plans: {
         Row: {
           created_at: string;
@@ -929,6 +1028,9 @@ export type Database = {
           strategy: string;
           updated_at: string;
           user_id: string;
+          card_goal_monthly_cents: number | null;
+          card_goal_target_cents: number | null;
+          card_goal_target_date: string | null;
         };
         Insert: {
           created_at?: string;
@@ -937,6 +1039,9 @@ export type Database = {
           strategy?: string;
           updated_at?: string;
           user_id: string;
+          card_goal_monthly_cents?: number | null;
+          card_goal_target_cents?: number | null;
+          card_goal_target_date?: string | null;
         };
         Update: {
           created_at?: string;
@@ -945,6 +1050,9 @@ export type Database = {
           strategy?: string;
           updated_at?: string;
           user_id?: string;
+          card_goal_monthly_cents?: number | null;
+          card_goal_target_cents?: number | null;
+          card_goal_target_date?: string | null;
         };
         Relationships: [
           {
@@ -980,6 +1088,7 @@ export type Database = {
           currency: string;
           display_name: string;
           id: string;
+          onboarding_completed_at: string | null;
           timezone: string;
           updated_at: string;
         };
@@ -988,6 +1097,7 @@ export type Database = {
           currency?: string;
           display_name?: string;
           id: string;
+          onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
         };
@@ -996,6 +1106,7 @@ export type Database = {
           currency?: string;
           display_name?: string;
           id?: string;
+          onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
         };
