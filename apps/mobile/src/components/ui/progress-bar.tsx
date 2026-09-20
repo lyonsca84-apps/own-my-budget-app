@@ -5,12 +5,14 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-export type ProgressTone = 'primary' | 'success' | 'watch';
+export type ProgressTone = 'primary' | 'success' | 'watch' | 'danger';
 
 const TONE_COLOR: Record<ProgressTone, ThemeColor> = {
   primary: 'primary',
   success: 'successSolid',
   watch: 'warningSolid',
+  // Genuinely overdue only (clay) — never for overspending or utilization.
+  danger: 'dangerSolid',
 };
 
 export interface ProgressBarProps {

@@ -55,6 +55,7 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'record-bill-payment', title: 'Record payment' },
   { name: 'add-debt', title: 'Add debt' },
   { name: 'record-debt-payment', title: 'Record payment' },
+  { name: 'plan-payment', title: 'Plan payment' },
   { name: 'add-savings-goal', title: 'Add savings goal' },
   { name: 'add-goal-activity', title: 'Goal activity' },
   { name: 'scan-receipt', title: 'Scan receipt' },
@@ -91,10 +92,10 @@ function RootNavigator() {
       <Stack.Protected guard={status === 'passwordRecovery'}>
         <Stack.Screen name="reset-password" />
       </Stack.Protected>
-      <Stack.Protected guard={status === 'signedIn' || status === 'guest'}>
       <Stack.Protected guard={status === 'needsOnboarding'}>
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
+      <Stack.Protected guard={status === 'signedIn' || status === 'guest'}>
         <Stack.Screen name="(tabs)" />
         {MODAL_SCREENS.map((screen) => (
           <Stack.Screen

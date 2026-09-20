@@ -12,8 +12,15 @@ import { supabase } from '@/lib/supabase';
 
 export default function RecordBillPaymentScreen() {
   const { user } = useAuth();
-  const { billId } = useLocalSearchParams<{ billId: string }>();
-  const [amount, setAmount] = useState('');
+  const { billId, amountCents: prefillCents } = useLocalSearchParams<{
+    billId: string;
+    amountCents?: string;
+  }>();
+  // Bills & Debt passes what's still owed so "Log payment" is one tap for a full payment.
+  const prefill = Number(prefillCents);
+  const [amount, setAmount] = useState(
+    Number.isFinite(prefill) && prefill > 0 ? (prefill / 100).toFixed(2) : ''
+  );
   const [paidOn, setPaidOn] = useState(formatLocalDate(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
