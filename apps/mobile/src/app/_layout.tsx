@@ -92,6 +92,9 @@ function RootNavigator() {
         <Stack.Screen name="reset-password" />
       </Stack.Protected>
       <Stack.Protected guard={status === 'signedIn' || status === 'guest'}>
+      <Stack.Protected guard={status === 'needsOnboarding'}>
+        <Stack.Screen name="onboarding" />
+      </Stack.Protected>
         <Stack.Screen name="(tabs)" />
         {MODAL_SCREENS.map((screen) => (
           <Stack.Screen

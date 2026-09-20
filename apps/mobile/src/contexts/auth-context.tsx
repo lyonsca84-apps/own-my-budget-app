@@ -9,6 +9,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { Platform } from 'react-native';
+import { getProfile, updateProfile } from '@own-my-budget/api';
 
 import { supabase } from '@/lib/supabase';
 
@@ -26,7 +27,8 @@ function oauthRedirectOptions() {
   return Platform.OS === 'web' ? { redirectTo: window.location.origin } : undefined;
 }
 
-export type AuthStatus = 'loading' | 'signedOut' | 'guest' | 'signedIn' | 'passwordRecovery';
+export type AuthStatus =
+  'loading' | 'signedOut' | 'guest' | 'needsOnboarding' | 'signedIn' | 'passwordRecovery';
 
 export interface AuthContextValue {
   status: AuthStatus;
@@ -41,18 +43,35 @@ export interface AuthContextValue {
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   continueAsGuest: () => Promise<void>;
   exitGuestMode: () => Promise<void>;
+  /** Marks the signed-in user's onboarding wizard as done, both in Supabase and locally. */
+  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+type OnboardingStatus = 'unknown' | 'incomplete' | 'complete';
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus>('unknown');
 
   useEffect(() => {
     let isMounted = true;
+
+    async function loadOnboardingStatus(userId: string) {
+      try {
+        const profile = await getProfile(supabase, userId);
+        if (!isMounted) return;
+        setOnboardingStatus(profile.onboarding_completed_at ? 'complete' : 'incomplete');
+      } catch {
+        // Transient fetch failure — try again shortly rather than stranding
+        // the user on the loading screen or wrongly re-showing onboarding.
+        if (isMounted) setOnboardingStatus('unknown');
+      }
+    }
 
     async function init() {
       const [{ data }, storedGuestFlag] = await Promise.all([
@@ -63,6 +82,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setSession(data.session);
       setIsGuest(storedGuestFlag === 'true' && !data.session);
       setHasLoadedOnce(true);
+      if (data.session) void loadOnboardingStatus(data.session.user.id);
     }
 
     init();
@@ -77,7 +97,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // it must land on the "set a new password" screen, not the tab shell
       // — this event is Supabase's signal that's exactly what happened.
       if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
-      if (event === 'SIGNED_OUT') setIsPasswordRecovery(false);
+      if (event === 'SIGNED_OUT') {
+        setIsPasswordRecovery(false);
+        setOnboardingStatus('unknown');
+      }
+      if (nextSession) void loadOnboardingStatus(nextSession.user.id);
     });
 
     return () => {
@@ -92,7 +116,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       : isPasswordRecovery
         ? 'passwordRecovery'
         : session
-          ? 'signedIn'
+          ? onboardingStatus === 'unknown'
+            ? 'loading'
+            : onboardingStatus === 'incomplete'
+              ? 'needsOnboarding'
+              : 'signedIn'
           : isGuest
             ? 'guest'
             : 'signedOut';
@@ -152,8 +180,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await AsyncStorage.removeItem(GUEST_MODE_KEY);
         setIsGuest(false);
       },
+
+      async completeOnboarding() {
+        if (!session?.user) return;
+        await updateProfile(supabase, session.user.id, {
+          onboarding_completed_at: new Date().toISOString(),
+        });
+        setOnboardingStatus('complete');
+      },
     };
-  }, [session, isGuest, hasLoadedOnce, isPasswordRecovery]);
+  }, [session, isGuest, hasLoadedOnce, isPasswordRecovery, onboardingStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
