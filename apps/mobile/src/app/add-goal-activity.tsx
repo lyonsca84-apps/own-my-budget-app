@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { recordGoalActivity } from '@own-my-budget/api';
-import { formatLocalDate } from '@own-my-budget/core';
+import { formatCents, formatLocalDate } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,24 @@ import { supabase } from '@/lib/supabase';
 import { notifyGoalMilestoneIfCrossed } from '@/lib/notifications';
 
 export default function AddGoalActivityScreen() {
-  const { goalId, kind } = useLocalSearchParams<{
+  const {
+    goalId,
+    kind,
+    amountCents: prefillCents,
+    note: prefillNote,
+  } = useLocalSearchParams<{
     goalId: string;
     kind: 'deposit' | 'withdrawal';
+    /** Optional prefill, e.g. the next 52-week-challenge week's deposit. */
+    amountCents?: string;
+    note?: string;
   }>();
   const { user } = useAuth();
   const isWithdrawal = kind === 'withdrawal';
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(() => {
+    const cents = Number(prefillCents);
+    return Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : '';
+  });
   const [occurredOn, setOccurredOn] = useState(formatLocalDate(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,22 +44,28 @@ export default function AddGoalActivityScreen() {
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      const goalBefore = isWithdrawal
-        ? null
-        : await supabase
-            .from('savings_goals')
-            .select('label, saved_cents, target_cents')
-            .eq('id', goalId)
-            .single();
+      const goalBefore = await supabase
+        .from('savings_goals')
+        .select('label, saved_cents, target_cents')
+        .eq('id', goalId)
+        .single();
+
+      if (isWithdrawal && goalBefore.data && amountCents > goalBefore.data.saved_cents) {
+        setErrorMessage(
+          `You only have ${formatCents(goalBefore.data.saved_cents)} saved in this goal.`
+        );
+        return;
+      }
 
       await recordGoalActivity(supabase, {
         goalId,
         amountCents,
         kind: isWithdrawal ? 'withdrawal' : 'deposit',
         occurredOn,
+        note: prefillNote || undefined,
       });
 
-      if (goalBefore?.data && user) {
+      if (!isWithdrawal && goalBefore.data && user) {
         // The deposit already succeeded above — a failure here (e.g. a
         // notification-permission hiccup) must never surface as an error
         // for an already-successful save.
@@ -74,6 +91,11 @@ export default function AddGoalActivityScreen() {
 
   return (
     <Screen>
+      {prefillNote ? (
+        <ThemedText type="smallBold" themeColor="primary">
+          {prefillNote}
+        </ThemedText>
+      ) : null}
       <TextField
         label="Amount"
         value={amount}
