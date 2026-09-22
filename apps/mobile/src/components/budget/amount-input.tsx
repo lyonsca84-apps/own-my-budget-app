@@ -20,7 +20,6 @@ export function parseDollarsToCents(text: string): number | null {
 }
 
 export interface AmountInputProps {
-  label: string;
   /** Screen-reader label — spell out what the amount is for ("Amount spent on Groceries in September 2026"). */
   accessibilityLabel: string;
   cents: number;
@@ -29,22 +28,23 @@ export interface AmountInputProps {
   onCommit: (cents: number | null) => void;
   /** Shown in the field when there is no value (e.g. an amount that hasn't been typed yet). */
   placeholder?: string;
-  showEmptyAsBlank?: boolean;
+  /** `muted` is the gray-filled look the design gives the planned amount. */
+  tone?: 'strong' | 'muted';
 }
 
 /**
- * Compact currency field for inline editing inside a list row. Holds its own
- * draft text while focused so typing is never overwritten by a data refresh,
- * then commits once on blur or submit.
+ * Compact currency field for inline editing inside a list row: "$" then a
+ * small right-aligned number box. Holds its own draft text while focused so
+ * typing is never overwritten by a data refresh, then commits once on blur or
+ * submit.
  */
 export function AmountInput({
-  label,
   accessibilityLabel,
   cents,
   editable = true,
   onCommit,
   placeholder = '0',
-  showEmptyAsBlank,
+  tone = 'strong',
 }: AmountInputProps) {
   const theme = useTheme();
   const [draft, setDraft] = useState<string | null>(null);
@@ -61,54 +61,42 @@ export function AmountInput({
     onCommit(parsed);
   }
 
-  const shown = draft ?? (showEmptyAsBlank && cents === 0 ? '' : centsToInputText(cents));
+  const shown = draft ?? centsToInputText(cents);
 
   return (
-    <View style={{ gap: Space[1], flexGrow: 1, flexBasis: 120, minWidth: 110 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[1] }}>
       <ThemedText type="small" themeColor="textSecondary" accessibilityElementsHidden>
-        {label}
+        $
       </ThemedText>
-      <View
+      <TextInput
+        accessibilityLabel={accessibilityLabel}
+        value={shown}
+        editable={editable}
+        placeholder={placeholder}
+        placeholderTextColor={theme.textSecondary}
+        keyboardType="decimal-pad"
+        inputMode="decimal"
+        selectTextOnFocus
+        onFocus={() => setDraft(centsToInputText(cents) === '0' ? '' : centsToInputText(cents))}
+        onChangeText={setDraft}
+        onBlur={commit}
+        onSubmitEditing={commit}
+        returnKeyType="done"
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
+          width: 88,
           minHeight: 44,
+          paddingHorizontal: Space[3],
           borderWidth: isFocused ? 2 : 1.5,
           borderColor: isFocused ? theme.primary : theme.controlBorder,
           borderRadius: Radius.input,
-          paddingHorizontal: Space[3],
-          backgroundColor: editable ? theme.backgroundElement : theme.backgroundSelected,
+          backgroundColor:
+            tone === 'muted' && !isFocused ? theme.background : theme.backgroundElement,
+          textAlign: 'right',
+          fontFamily: tone === 'strong' ? Fonts.body.bold : Fonts.body.semibold,
+          fontSize: 15,
+          color: tone === 'strong' ? theme.text : theme.textSecondary,
         }}
-      >
-        <ThemedText themeColor="textSecondary" accessibilityElementsHidden>
-          $
-        </ThemedText>
-        <TextInput
-          accessibilityLabel={accessibilityLabel}
-          value={shown}
-          editable={editable}
-          placeholder={placeholder}
-          placeholderTextColor={theme.textSecondary}
-          keyboardType="decimal-pad"
-          inputMode="decimal"
-          selectTextOnFocus
-          onFocus={() => setDraft(centsToInputText(cents) === '0' ? '' : centsToInputText(cents))}
-          onChangeText={setDraft}
-          onBlur={commit}
-          onSubmitEditing={commit}
-          returnKeyType="done"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 40,
-            paddingLeft: Space[1],
-            textAlign: 'right',
-            fontFamily: Fonts.body.semibold,
-            fontSize: 17,
-            color: theme.text,
-          }}
-        />
-      </View>
+      />
     </View>
   );
 }

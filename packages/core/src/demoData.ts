@@ -1,9 +1,14 @@
 /**
- * Deterministic demo/seed dataset — a realistic biweekly-paid household, per
- * PLAN.md §2: 8 bills, 2 credit cards, a car loan, a mortgage, 2 savings
- * goals, and a few months of transaction history. Used by guest/demo mode
- * (instant load, "Reset demo data" button) and by screens before real
- * account data exists. Money is always integer cents; dates are ISO strings.
+ * Deterministic demo dataset matching the approved design screenshots
+ * (design/App Screenshots): four pay schedules, six bills, eleven credit
+ * cards, six loans/mortgages, four savings goals. Every date is relative to
+ * "today", so overdue/upcoming/current-month states always look right.
+ *
+ * NOTE: guest mode itself no longer reads this — it runs the real query code
+ * against the in-memory client in packages/api/src/guest (whose seed holds the
+ * same figures). This object remains for the few screens that still render a
+ * bespoke guest branch, and as a plain fixture for pure-logic tests. Money is
+ * always integer cents; dates are ISO strings.
  *
  * This is intentionally simple, hand-authored data plus a couple of trivial
  * sums — the real budgeting math (money-left-to-spend, rollover, payoff
@@ -25,7 +30,7 @@ export interface DemoIncomeSource {
   id: string;
   label: string;
   amountCents: number;
-  frequency: 'biweekly';
+  frequency: 'weekly' | 'biweekly' | 'monthly';
   nextPayDate: string;
 }
 
@@ -33,6 +38,7 @@ export interface DemoIncomeSource {
 // root via `export * from './budgeting'` — don't redeclare or re-export it
 // here too, or the root index.ts barrel export becomes ambiguous.
 import type { BillStatus } from './budgeting';
+import { formatLocalDate } from './dates';
 
 export interface DemoBill {
   id: string;
@@ -41,9 +47,11 @@ export interface DemoBill {
   dueDate: string;
   category: string;
   status: BillStatus;
+  /** Set when the bill is partly paid (status stays 'upcoming'/'overdue'). */
+  paidCents?: number;
 }
 
-export type DebtType = 'creditCard' | 'autoLoan' | 'mortgage';
+export type DebtType = 'creditCard' | 'autoLoan' | 'mortgage' | 'heloc' | 'personalLoan' | 'other';
 
 export interface DemoDebt {
   id: string;
@@ -53,6 +61,10 @@ export interface DemoDebt {
   aprBasisPoints: number;
   minimumPaymentCents: number;
   creditLimitCents?: number;
+  /** What the "Plan payment" figure on a card shows; omitted when none is set. */
+  plannedPaymentCents?: number;
+  issuer?: string;
+  last4?: string;
 }
 
 export interface DemoSavingsGoal {
@@ -61,6 +73,8 @@ export interface DemoSavingsGoal {
   targetCents: number;
   savedCents: number;
   targetDate: string;
+  /** True for the 52-week challenge, which is tracked as a goal. */
+  isChallenge?: boolean;
 }
 
 export interface DemoTransaction {
@@ -81,244 +95,247 @@ export interface DemoData {
   transactions: DemoTransaction[];
 }
 
-export const DEMO_DATA: DemoData = {
-  profile: { displayName: 'Jordan', currency: 'USD' },
+const c = (dollars: number) => Math.round(dollars * 100);
 
-  account: { id: 'acct-checking', label: 'Checking', balanceCents: 184_732 },
+/** Builds the demo dataset as of `today`. Same input, same output. */
+export function buildDemoData(today: Date): DemoData {
+  const on = (days: number) =>
+    formatLocalDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days));
+  const monthFirst = (offset: number) =>
+    formatLocalDate(new Date(today.getFullYear(), today.getMonth() + offset, 1));
 
-  incomeSources: [
-    {
-      id: 'income-primary',
-      label: 'Paycheck — Riverside Retail',
-      amountCents: 162_400,
-      frequency: 'biweekly',
-      nextPayDate: '2026-09-12',
-    },
-  ],
+  const card = (
+    id: string,
+    label: string,
+    balanceCents: number,
+    minDollars: number,
+    plannedDollars?: number,
+    extra: Partial<DemoDebt> = {}
+  ): DemoDebt => ({
+    id,
+    label,
+    type: 'creditCard',
+    balanceCents,
+    aprBasisPoints: 0,
+    minimumPaymentCents: c(minDollars),
+    ...(plannedDollars ? { plannedPaymentCents: c(plannedDollars) } : {}),
+    ...extra,
+  });
 
-  bills: [
-    {
-      id: 'bill-rent',
-      label: 'Rent',
-      amountCents: 142_000,
-      dueDate: '2026-09-01',
-      category: 'Housing',
-      status: 'paid',
-    },
-    {
-      id: 'bill-electric',
-      label: 'Electric',
-      amountCents: 11_200,
-      dueDate: '2026-09-08',
-      category: 'Utilities',
-      status: 'upcoming',
-    },
-    {
-      id: 'bill-water',
-      label: 'Water & Sewer',
-      amountCents: 4_800,
-      dueDate: '2026-09-10',
-      category: 'Utilities',
-      status: 'upcoming',
-    },
-    {
-      id: 'bill-internet',
-      label: 'Internet',
-      amountCents: 6_500,
-      dueDate: '2026-09-14',
-      category: 'Utilities',
-      status: 'upcoming',
-    },
-    {
-      id: 'bill-phone',
-      label: 'Phone',
-      amountCents: 5_500,
-      dueDate: '2026-09-15',
-      category: 'Utilities',
-      status: 'upcoming',
-    },
-    {
-      id: 'bill-car-insurance',
-      label: 'Car Insurance',
-      amountCents: 13_900,
-      dueDate: '2026-09-05',
-      category: 'Insurance',
-      status: 'overdue',
-    },
-    {
-      id: 'bill-streaming',
-      label: 'Streaming Bundle',
-      amountCents: 2_299,
-      dueDate: '2026-09-20',
-      category: 'Subscriptions',
-      status: 'upcoming',
-    },
-    {
-      id: 'bill-gym',
-      label: 'Gym Membership',
-      amountCents: 3_500,
-      dueDate: '2026-09-22',
-      category: 'Subscriptions',
-      status: 'upcoming',
-    },
-  ],
+  return {
+    profile: { displayName: 'Carol', currency: 'USD' },
 
-  debts: [
-    {
-      id: 'debt-card-1',
-      label: 'Everyday Visa',
-      type: 'creditCard',
-      balanceCents: 214_500,
-      aprBasisPoints: 2399,
-      minimumPaymentCents: 6_500,
-      creditLimitCents: 500_000,
-    },
-    {
-      id: 'debt-card-2',
-      label: 'Store Card',
-      type: 'creditCard',
-      balanceCents: 68_200,
-      aprBasisPoints: 2899,
-      minimumPaymentCents: 2_500,
-      creditLimitCents: 150_000,
-    },
-    {
-      id: 'debt-auto',
-      label: 'Car Loan — 2022 Sedan',
-      type: 'autoLoan',
-      balanceCents: 1_184_000,
-      aprBasisPoints: 649,
-      minimumPaymentCents: 38_900,
-    },
-    {
-      id: 'debt-mortgage',
-      label: 'Mortgage',
-      type: 'mortgage',
-      balanceCents: 21_840_000,
-      aprBasisPoints: 599,
-      minimumPaymentCents: 142_000,
-    },
-  ],
+    account: { id: 'acct-checking', label: 'Checking', balanceCents: c(9860) },
 
-  savingsGoals: [
-    {
-      id: 'goal-emergency',
-      label: 'Emergency Fund',
-      targetCents: 300_000,
-      savedCents: 87_500,
-      targetDate: '2027-03-01',
-    },
-    {
-      id: 'goal-vacation',
-      label: 'Family Vacation',
-      targetCents: 150_000,
-      savedCents: 42_000,
-      targetDate: '2027-06-01',
-    },
-  ],
+    incomeSources: [
+      {
+        id: 'income-jamie',
+        label: 'Jamie · Retail Job',
+        amountCents: c(1250),
+        frequency: 'biweekly',
+        nextPayDate: on(6),
+      },
+      {
+        id: 'income-sam',
+        label: 'Sam · Freelance Design',
+        amountCents: c(900),
+        frequency: 'monthly',
+        nextPayDate: monthFirst(1),
+      },
+      {
+        id: 'income-clifton',
+        label: 'Clifton Lyons · Penske',
+        amountCents: c(2500),
+        frequency: 'weekly',
+        nextPayDate: on(5),
+      },
+      {
+        id: 'income-carol',
+        label: 'carol Lyons · Northside Hospital.',
+        amountCents: c(3000),
+        frequency: 'biweekly',
+        nextPayDate: on(5),
+      },
+    ],
 
-  transactions: [
-    {
-      id: 'txn-1',
-      label: 'Grocery Mart',
-      amountCents: -8_734,
-      date: '2026-07-03',
-      category: 'Groceries',
-    },
-    {
-      id: 'txn-2',
-      label: 'Riverside Retail Paycheck',
-      amountCents: 162_400,
-      date: '2026-07-05',
-      category: 'Income',
-    },
-    {
-      id: 'txn-3',
-      label: 'Gas Station',
-      amountCents: -4_210,
-      date: '2026-07-08',
-      category: 'Transportation',
-    },
-    {
-      id: 'txn-4',
-      label: 'Grocery Mart',
-      amountCents: -9_920,
-      date: '2026-07-15',
-      category: 'Groceries',
-    },
-    {
-      id: 'txn-5',
-      label: 'Riverside Retail Paycheck',
-      amountCents: 162_400,
-      date: '2026-07-19',
-      category: 'Income',
-    },
-    { id: 'txn-6', label: 'Pharmacy', amountCents: -2_845, date: '2026-07-22', category: 'Health' },
-    {
-      id: 'txn-7',
-      label: 'Grocery Mart',
-      amountCents: -7_610,
-      date: '2026-08-01',
-      category: 'Groceries',
-    },
-    {
-      id: 'txn-8',
-      label: 'Riverside Retail Paycheck',
-      amountCents: 162_400,
-      date: '2026-08-02',
-      category: 'Income',
-    },
-    {
-      id: 'txn-9',
-      label: 'Gas Station',
-      amountCents: -4_580,
-      date: '2026-08-09',
-      category: 'Transportation',
-    },
-    {
-      id: 'txn-10',
-      label: 'Grocery Mart',
-      amountCents: -10_215,
-      date: '2026-08-14',
-      category: 'Groceries',
-    },
-    {
-      id: 'txn-11',
-      label: 'Riverside Retail Paycheck',
-      amountCents: 162_400,
-      date: '2026-08-16',
-      category: 'Income',
-    },
-    {
-      id: 'txn-12',
-      label: 'Restaurant',
-      amountCents: -5_400,
-      date: '2026-08-23',
-      category: 'Dining',
-    },
-    {
-      id: 'txn-13',
-      label: 'Grocery Mart',
-      amountCents: -8_990,
-      date: '2026-08-29',
-      category: 'Groceries',
-    },
-    {
-      id: 'txn-14',
-      label: 'Riverside Retail Paycheck',
-      amountCents: 162_400,
-      date: '2026-08-30',
-      category: 'Income',
-    },
-    {
-      id: 'txn-15',
-      label: 'Gas Station',
-      amountCents: -4_350,
-      date: '2026-09-02',
-      category: 'Transportation',
-    },
-  ],
-};
+    bills: [
+      {
+        id: 'bill-rent',
+        label: 'Rent',
+        amountCents: c(1450),
+        dueDate: monthFirst(0),
+        category: 'Housing',
+        status: 'paid',
+        paidCents: c(1450),
+      },
+      {
+        id: 'bill-electric',
+        label: 'Electric',
+        amountCents: c(145),
+        dueDate: on(3),
+        category: 'Utilities',
+        status: 'upcoming',
+      },
+      {
+        id: 'bill-internet',
+        label: 'Internet',
+        amountCents: c(70),
+        dueDate: on(5),
+        category: 'Utilities',
+        status: 'upcoming',
+        paidCents: c(35),
+      },
+      {
+        id: 'bill-car-insurance',
+        label: 'Car Insurance',
+        amountCents: c(120),
+        dueDate: on(8),
+        category: 'Transportation',
+        status: 'upcoming',
+      },
+      {
+        id: 'bill-phone',
+        label: 'Phone',
+        amountCents: c(85),
+        dueDate: on(-6),
+        category: 'Utilities',
+        status: 'overdue',
+      },
+      {
+        id: 'bill-streaming',
+        label: 'Streaming Bundle',
+        amountCents: c(24),
+        dueDate: on(11),
+        category: 'Entertainment',
+        status: 'paid',
+        paidCents: c(24),
+      },
+    ],
+
+    debts: [
+      card('debt-card-1', 'Civic Legacy Credit Card', 148_141, 25, 50, {
+        issuer: 'Bank of America',
+        last4: '4821',
+      }),
+      card('debt-card-2', 'Civic Classic Credit Card', 79_285, 25, 50, {
+        issuer: 'Bank of America',
+        last4: '2210',
+      }),
+      card('debt-card-3', 'Chase', 1_922_100, 224, undefined, { issuer: 'Chase' }),
+      card('debt-card-4', 'AA Citi', 624_438, 281.25, undefined, { issuer: 'Citi' }),
+      card('debt-card-5', 'LGE Credit Card', 294_200, 40, 75),
+      card('debt-card-6', 'Discover — Husband', 173_000, 35, undefined, { issuer: 'Discover' }),
+      card('debt-card-7', "Sam's Club", 81_900, 29, 50),
+      card('debt-card-8', 'QVC', 20_900, 41),
+      card('debt-card-9', 'Belk', 24_300, 29, 50),
+      card('debt-card-10', 'Apple Credit — Carol', 32_500, 25, 100, { issuer: 'Apple' }),
+      card('debt-card-11', 'Apple Credit — Husband', 18_900, 25, 50, { issuer: 'Apple' }),
+      {
+        id: 'debt-mortgage',
+        label: 'Primary Mortgage',
+        type: 'mortgage',
+        balanceCents: c(337_500),
+        aprBasisPoints: 0,
+        minimumPaymentCents: c(2368),
+      },
+      {
+        id: 'debt-mortgage-2',
+        label: 'Second Mortgage',
+        type: 'mortgage',
+        balanceCents: 0,
+        aprBasisPoints: 0,
+        minimumPaymentCents: c(975),
+      },
+      {
+        id: 'debt-heloc',
+        label: 'HELOC',
+        type: 'heloc',
+        balanceCents: c(64_000),
+        aprBasisPoints: 750,
+        minimumPaymentCents: 0,
+      },
+      {
+        id: 'debt-discover-loan',
+        label: 'Discover Personal Loan',
+        type: 'personalLoan',
+        balanceCents: c(2420),
+        aprBasisPoints: 0,
+        minimumPaymentCents: c(169),
+      },
+      {
+        id: 'debt-affirm',
+        label: 'Affirm',
+        type: 'personalLoan',
+        balanceCents: c(680),
+        aprBasisPoints: 0,
+        minimumPaymentCents: c(95),
+      },
+      {
+        id: 'debt-other-loan',
+        label: 'Other Loan',
+        type: 'other',
+        balanceCents: 0,
+        aprBasisPoints: 0,
+        minimumPaymentCents: c(93),
+      },
+    ],
+
+    savingsGoals: [
+      {
+        id: 'goal-challenge',
+        label: '52-Week Money Challenge',
+        targetCents: c(1378),
+        savedCents: c(15),
+        targetDate: on(300),
+        isChallenge: true,
+      },
+      {
+        id: 'goal-emergency',
+        label: 'Emergency Fund',
+        targetCents: c(6000),
+        savedCents: c(3200),
+        targetDate: monthFirst(8),
+      },
+      {
+        id: 'goal-vacation',
+        label: 'Family Vacation',
+        targetCents: c(2500),
+        savedCents: c(900),
+        targetDate: monthFirst(3),
+      },
+      {
+        id: 'goal-laptop',
+        label: 'New Laptop',
+        targetCents: c(1200),
+        savedCents: c(1200),
+        targetDate: on(-30),
+      },
+    ],
+
+    transactions: [
+      ['Coffee Shop', 'Food', 0, 6.25],
+      ['Kroger', 'Food', 1, 84.32],
+      ['Shell', 'Transportation', 2, 41.1],
+      ['Chipotle', 'Food', 3, 13.85],
+      ['Target', 'Shopping', 4, 52.47],
+      ['AMC Theatres', 'Entertainment', 5, 28],
+      ['CVS Pharmacy', 'Health', 6, 18.64],
+      ["Trader Joe's", 'Food', 8, 67.9],
+      ['Shell', 'Transportation', 9, 38.75],
+      ['Olive Garden', 'Food', 11, 46.2],
+      ['Amazon', 'Shopping', 13, 31.99],
+      ['Kroger', 'Food', 15, 91.14],
+    ].map(([label, category, daysAgo, dollars], index) => ({
+      id: `txn-${index + 1}`,
+      label: label as string,
+      amountCents: -c(dollars as number),
+      date: on(-(daysAgo as number)),
+      category: category as string,
+    })),
+  };
+}
+
+export const DEMO_DATA: DemoData = buildDemoData(new Date());
 
 /** Sum of all bill amounts that are not yet paid (upcoming + overdue). */
 export function sumUnpaidBills(data: DemoData): number {

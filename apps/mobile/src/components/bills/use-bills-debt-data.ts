@@ -11,18 +11,15 @@ import {
   updateBill,
 } from '@own-my-budget/api';
 import {
-  DEMO_DATA,
   canUseAdvancedDebtScenarios,
   type PayoffStrategy,
   type PlanTier,
 } from '@own-my-budget/core';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import {
-  billItemFromDemo,
   billItemFromRow,
-  debtItemFromDemo,
   debtItemFromRow,
   isCreditCard,
   type BillItem,
@@ -51,7 +48,7 @@ const DEFAULT_PREFS: PayoffPrefs = {
 };
 
 export interface BillsDebtData {
-  /** Guests see read-only sample data; every write is redirected to sign-up. */
+  /** Guest mode runs the same code against the sample database — use for copy only. */
   isGuest: boolean;
   isLoading: boolean;
   errorMessage: string | null;
@@ -70,15 +67,14 @@ export interface BillsDebtData {
 }
 
 /**
- * Loads everything Bills & Debt shows. Signed-in users get their real rows;
- * guests get the shared demo dataset (same as the Dashboard). The optional
- * pieces added by migration 20260920100000 (payment plans, payoff prefs) fail
- * soft, so an un-migrated database degrades to "nothing planned yet" instead
- * of breaking the screen.
+ * Loads everything Bills & Debt shows through the normal API. Guests run the
+ * exact same code — `supabase` is the in-memory sample database for them.
+ * The optional pieces added by migration 20260920100000 (payment plans,
+ * payoff prefs) fail soft, so an un-migrated database degrades to "nothing
+ * planned yet" instead of breaking the screen.
  */
 export function useBillsDebtData(): BillsDebtData {
-  const { status, user } = useAuth();
-  const isGuest = status === 'guest';
+  const { userId, isReady, isGuest, guestDataVersion } = useDataUser();
   const [bills, setBills] = useState<BillItem[]>([]);
   const [debts, setDebts] = useState<DebtItem[]>([]);
   const [plans, setPlans] = useState<Record<string, PlanSummary>>({});
@@ -89,24 +85,17 @@ export function useBillsDebtData(): BillsDebtData {
   const hasLoaded = useRef(false);
 
   const reload = useCallback(async () => {
-    if (isGuest) {
-      setBills(DEMO_DATA.bills.map(billItemFromDemo));
-      setDebts(DEMO_DATA.debts.map(debtItemFromDemo));
-      setPlans({});
-      setIsLoading(false);
-      return;
-    }
-    if (status !== 'signedIn' || !user) return;
+    if (!isReady || !userId) return;
     // Only the very first load shows the loading state — coming back from a
-    // payment modal refreshes in place so the layout never flashes.
+    // payment dialog refreshes in place so the layout never flashes.
     if (!hasLoaded.current) setIsLoading(true);
     try {
       const [billRows, debtRows, planRows, payoffRow, account] = await Promise.all([
-        listBillsWithPayments(supabase, user.id),
-        listDebtsWithPayments(supabase, user.id),
-        listPaydayAssignments(supabase, user.id).catch(() => []),
-        getPayoffPlan(supabase, user.id).catch(() => null),
-        getCurrentAccount(supabase, user.id).catch(() => null),
+        listBillsWithPayments(supabase, userId),
+        listDebtsWithPayments(supabase, userId),
+        listPaydayAssignments(supabase, userId).catch(() => []),
+        getPayoffPlan(supabase, userId).catch(() => null),
+        getCurrentAccount(supabase, userId).catch(() => null),
       ]);
       const now = new Date();
       setBills(billRows.map((row) => billItemFromRow(row, now)));
@@ -147,7 +136,9 @@ export function useBillsDebtData(): BillsDebtData {
     } finally {
       setIsLoading(false);
     }
-  }, [isGuest, status, user]);
+    // guestDataVersion: reload after the guest sample data is reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, userId, guestDataVersion]);
 
   useFocusEffect(
     useCallback(() => {
@@ -155,28 +146,21 @@ export function useBillsDebtData(): BillsDebtData {
     }, [reload])
   );
 
-  const setBillReminder = useCallback(
-    async (billId: string, enabled: boolean) => {
-      const previous = bills;
+  const setBillReminder = useCallback(async (billId: string, enabled: boolean) => {
+    // Optimistic: flip the checkbox now, roll back if the save fails.
+    setBills((list) => list.map((b) => (b.id === billId ? { ...b, reminderEnabled: enabled } : b)));
+    try {
+      await updateBill(supabase, billId, { reminder_enabled: enabled });
+    } catch (error) {
       setBills((list) =>
-        list.map((b) => (b.id === billId ? { ...b, reminderEnabled: enabled } : b))
+        list.map((b) => (b.id === billId ? { ...b, reminderEnabled: !enabled } : b))
       );
-      if (isGuest) return;
-      try {
-        await updateBill(supabase, billId, { reminder_enabled: enabled });
-      } catch (error) {
-        setBills(previous);
-        setErrorMessage(
-          error instanceof Error ? error.message : "We couldn't change that reminder."
-        );
-      }
-    },
-    [bills, isGuest]
-  );
+      setErrorMessage(error instanceof Error ? error.message : "We couldn't change that reminder.");
+    }
+  }, []);
 
   const removeDebt = useCallback(
     async (debtId: string) => {
-      if (isGuest) return;
       try {
         await archiveDebt(supabase, debtId);
         await reload();
@@ -186,14 +170,14 @@ export function useBillsDebtData(): BillsDebtData {
         );
       }
     },
-    [isGuest, reload]
+    [reload]
   );
 
   const savePrefs = useCallback(
     async (changes: Partial<PayoffPrefs>) => {
       const next = { ...prefs, ...changes };
       setPrefs(next);
-      if (isGuest || !user) return;
+      if (!userId) return;
       try {
         // Goal columns are only sent once the goal is in play, so saving
         // strategy/extra keeps working on a database that hasn't had
@@ -202,7 +186,7 @@ export function useBillsDebtData(): BillsDebtData {
           'goalTargetCents' in changes ||
           'goalTargetDate' in changes ||
           'goalMonthlyCents' in changes;
-        await savePayoffPlan(supabase, user.id, {
+        await savePayoffPlan(supabase, userId, {
           strategy: next.strategy,
           extra_monthly_cents: next.extraMonthlyCents,
           ...(touchesGoal
@@ -219,7 +203,7 @@ export function useBillsDebtData(): BillsDebtData {
         );
       }
     },
-    [isGuest, prefs, user]
+    [prefs, userId]
   );
 
   const cards = useMemo(() => debts.filter(isCreditCard), [debts]);

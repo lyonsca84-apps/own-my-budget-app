@@ -1,43 +1,105 @@
+import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { View } from 'react-native';
+import { listDebtsWithPayments, listSavingsGoals } from '@own-my-budget/api';
 import {
-  listDebtsWithPayments,
-  listSavingsGoals,
-  type DebtWithPayments,
-  type Tables,
-} from '@own-my-budget/api';
-import { calculateCreditUtilization, calculateSavingsProgress } from '@own-my-budget/core';
+  DEMO_DATA,
+  calculateCreditUtilization,
+  calculateSavingsProgress,
+  formatCents,
+} from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { CurrencyText } from '@/components/ui/currency-text';
+import { useReportsGate } from '@/components/reports/use-reports-gate';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Grid } from '@/components/ui/grid';
+import { LimitNotice } from '@/components/ui/limit-notice';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatTile } from '@/components/ui/stat-tile';
+import { Space } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Space } from '@/constants/theme';
+
+interface DebtRow {
+  id: string;
+  label: string;
+  balanceCents: number;
+  paidCents: number | null;
+  creditLimitCents: number | null;
+}
+
+interface GoalRow {
+  id: string;
+  label: string;
+  savedCents: number;
+  targetCents: number;
+}
+
+function demoRows(): { debts: DebtRow[]; goals: GoalRow[] } {
+  return {
+    debts: DEMO_DATA.debts.map((d) => ({
+      id: d.id,
+      label: d.label,
+      balanceCents: d.balanceCents,
+      paidCents: null,
+      creditLimitCents: d.creditLimitCents ?? null,
+    })),
+    goals: DEMO_DATA.savingsGoals.map((g) => ({
+      id: g.id,
+      label: g.label,
+      savedCents: g.savedCents,
+      targetCents: g.targetCents,
+    })),
+  };
+}
 
 export default function ReportDebtSavingsScreen() {
   const { status, user } = useAuth();
-  const [debts, setDebts] = useState<DebtWithPayments[]>([]);
-  const [goals, setGoals] = useState<Tables<'savings_goals'>[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { gate, isLoading: isGateLoading } = useReportsGate();
+  const isGuest = status === 'guest';
+  const canView = gate?.allowed === true;
+  const [debts, setDebts] = useState<DebtRow[]>([]);
+  const [goals, setGoals] = useState<GoalRow[]>([]);
+  const [isLoading, setIsLoading] = useState(status === 'signedIn');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (status !== 'signedIn' || !user) return;
+    if (status !== 'signedIn' || !user || !canView) return;
     setIsLoading(true);
-    const [d, g] = await Promise.all([
-      listDebtsWithPayments(supabase, user.id),
-      listSavingsGoals(supabase, user.id),
-    ]);
-    setDebts(d);
-    setGoals(g);
-    setIsLoading(false);
-  }, [status, user]);
+    setErrorMessage(null);
+    try {
+      const [d, g] = await Promise.all([
+        listDebtsWithPayments(supabase, user.id),
+        listSavingsGoals(supabase, user.id),
+      ]);
+      setDebts(
+        d.map((debt) => ({
+          id: debt.id,
+          label: debt.label,
+          balanceCents: debt.balance_cents,
+          paidCents: debt.debt_payments.reduce((sum, p) => sum + p.amount_cents, 0),
+          creditLimitCents: debt.credit_limit_cents,
+        }))
+      );
+      setGoals(
+        g.map((goal) => ({
+          id: goal.id,
+          label: goal.label,
+          savedCents: goal.saved_cents,
+          targetCents: goal.target_cents,
+        }))
+      );
+    } catch {
+      setErrorMessage("We couldn't load your debts and goals just now.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [status, user, canView]);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,64 +107,110 @@ export default function ReportDebtSavingsScreen() {
     }, [reload])
   );
 
-  const totalDebtPaid = debts.reduce(
-    (sum, d) => sum + d.debt_payments.reduce((s, p) => s + p.amount_cents, 0),
-    0
-  );
-  const totalSaved = goals.reduce((sum, g) => sum + g.saved_cents, 0);
+  const rows = isGuest ? demoRows() : { debts, goals };
+  const totalDebtCents = rows.debts.reduce((sum, d) => sum + d.balanceCents, 0);
+  const totalPaidCents = rows.debts.reduce((sum, d) => sum + (d.paidCents ?? 0), 0);
+  const totalSavedCents = rows.goals.reduce((sum, g) => sum + g.savedCents, 0);
 
   return (
-    <Screen>
-      {isLoading ? (
-        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+    <Screen showGuestBanner>
+      <Stack.Screen options={{ title: 'Debt & savings progress' }} />
+      <ScreenHeader
+        title="Debt & savings progress"
+        subtitle="What you owe, what you've paid, and how your goals are filling up."
+      />
+
+      {isGateLoading || (!isGuest && isLoading) ? (
+        <Card>
+          <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+        </Card>
+      ) : !canView ? (
+        <LimitNotice
+          title="Full reports are on a higher plan"
+          reason={gate?.reason ?? "We couldn't check your plan just now. Please try again."}
+        />
+      ) : errorMessage ? (
+        <Card style={{ gap: Space[3] }}>
+          <ThemedText themeColor="warning">{errorMessage}</ThemedText>
+          <View style={{ flexDirection: 'row' }}>
+            <Button label="Try again" variant="secondary" onPress={reload} />
+          </View>
+        </Card>
       ) : (
         <>
           <Grid>
             <StatTile
-              label="Paid toward debt"
-              valueCents={totalDebtPaid}
+              label="Debt remaining"
+              valueCents={totalDebtCents}
               glyph="↘"
-              glyphColor="accent"
-              glyphTint="accentMuted"
+              glyphColor="primary"
+              glyphTint="primaryMuted"
+              description="Total balance across your debts."
             />
+            {!isGuest ? (
+              <StatTile
+                label="Paid toward debt"
+                valueCents={totalPaidCents}
+                glyph="✓"
+                glyphColor="success"
+                glyphTint="successMuted"
+                description="Payments you've recorded."
+              />
+            ) : null}
             <StatTile
               label="Total saved"
-              valueCents={totalSaved}
+              valueCents={totalSavedCents}
               glyph="◆"
               glyphColor="success"
               glyphTint="successMuted"
+              description="Across all your savings goals."
             />
           </Grid>
 
-          {debts.length === 0 ? (
+          {rows.debts.length === 0 ? (
             <EmptyState
+              mascot
               title="No debts on file"
-              message="Add a debt from the Money tab to track it here."
+              message="Nothing to track here — or add a debt from the Bills tab to follow its progress."
             />
           ) : (
             <SectionCard title="Debts">
               <View style={{ gap: Space[4] }}>
-                {debts.map((debt) => {
-                  const utilization = debt.credit_limit_cents
-                    ? calculateCreditUtilization(debt.balance_cents, debt.credit_limit_cents)
+                {rows.debts.map((debt) => {
+                  const utilization = debt.creditLimitCents
+                    ? calculateCreditUtilization(debt.balanceCents, debt.creditLimitCents)
                     : null;
                   return (
-                    <View key={debt.id} style={{ gap: Space[1] }}>
+                    <View key={debt.id} style={{ gap: Space[2] }}>
                       <View
                         style={{
                           flexDirection: 'row',
                           justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: Space[3],
                         }}
                       >
-                        <ThemedText>{debt.label}</ThemedText>
-                        <CurrencyText cents={debt.balance_cents} size="row" />
-                      </View>
-                      {utilization !== null && (
-                        <ThemedText type="small" themeColor="textSecondary">
-                          {utilization.toFixed(0)}% of credit limit used
+                        <ThemedText type="smallBold" style={{ flexShrink: 1 }}>
+                          {debt.label}
                         </ThemedText>
-                      )}
+                        <ThemedText type="amountSmall">{formatCents(debt.balanceCents)}</ThemedText>
+                      </View>
+                      {utilization !== null ? (
+                        <>
+                          <ProgressBar
+                            percent={utilization}
+                            tone={utilization > 50 ? 'watch' : 'primary'}
+                          />
+                          <ThemedText type="small" themeColor="textSecondary">
+                            {utilization.toFixed(0)}% of credit limit used
+                          </ThemedText>
+                        </>
+                      ) : null}
+                      {debt.paidCents ? (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {formatCents(debt.paidCents)} paid so far
+                        </ThemedText>
+                      ) : null}
                     </View>
                   );
                 })}
@@ -110,26 +218,38 @@ export default function ReportDebtSavingsScreen() {
             </SectionCard>
           )}
 
-          {goals.length === 0 ? (
+          {rows.goals.length === 0 ? (
             <EmptyState
+              mascot
               title="No savings goals yet"
-              message="Add one from the Money tab to track progress here."
+              message="Add one from the Goals tab and watch it fill up here."
             />
           ) : (
             <SectionCard title="Savings goals">
               <View style={{ gap: Space[4] }}>
-                {goals.map((goal) => {
-                  const progress = calculateSavingsProgress(goal.saved_cents, goal.target_cents);
+                {rows.goals.map((goal) => {
+                  const progress = calculateSavingsProgress(goal.savedCents, goal.targetCents);
                   return (
                     <View key={goal.id} style={{ gap: Space[2] }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <ThemedText>{goal.label}</ThemedText>
-                        <ThemedText>{progress.percent.toFixed(0)}%</ThemedText>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          gap: Space[3],
+                        }}
+                      >
+                        <ThemedText type="smallBold" style={{ flexShrink: 1 }}>
+                          {goal.label}
+                        </ThemedText>
+                        <ThemedText type="smallBold">{progress.percent.toFixed(0)}%</ThemedText>
                       </View>
                       <ProgressBar
                         percent={progress.percent}
                         tone={progress.isComplete ? 'success' : 'primary'}
                       />
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {formatCents(goal.savedCents)} of {formatCents(goal.targetCents)}
+                      </ThemedText>
                     </View>
                   );
                 })}

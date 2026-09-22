@@ -1,63 +1,50 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { Stack } from 'expo-router';
 import { View } from 'react-native';
 import {
-  listPaychecks,
-  listBillPaymentsForReports,
-  listDebtPaymentsForReports,
-} from '@own-my-budget/api';
-import { calculateMonthlyTrend, formatCents, type MonthlyTotal } from '@own-my-budget/core';
+  calculateMonthlyTrend,
+  formatCents,
+  formatLocalDate,
+  monthDateRange,
+} from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { CurrencyText } from '@/components/ui/currency-text';
+import { formatMonthKey } from '@/components/reports/format';
+import { useReportData } from '@/components/reports/use-report-data';
+import { useReportsGate } from '@/components/reports/use-reports-gate';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Grid } from '@/components/ui/grid';
+import { LimitNotice } from '@/components/ui/limit-notice';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { SectionCard } from '@/components/ui/section-card';
-import { useAuth } from '@/contexts/auth-context';
-import { useTheme } from '@/hooks/use-theme';
-import { supabase } from '@/lib/supabase';
+import { StatTile } from '@/components/ui/stat-tile';
 import { Space } from '@/constants/theme';
 
 const MONTHS_BACK = 6;
 
 export default function ReportIncomeExpensesScreen() {
-  const { status, user } = useAuth();
-  const theme = useTheme();
-  const [income, setIncome] = useState<MonthlyTotal[]>([]);
-  const [expenses, setExpenses] = useState<MonthlyTotal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { gate, isLoading: isGateLoading } = useReportsGate();
+  const canView = gate?.allowed === true;
 
-  const reload = useCallback(async () => {
-    if (status !== 'signedIn' || !user) return;
-    setIsLoading(true);
-    const [paychecks, billPayments, debtPayments] = await Promise.all([
-      listPaychecks(supabase, user.id),
-      listBillPaymentsForReports(supabase, user.id),
-      listDebtPaymentsForReports(supabase, user.id),
-    ]);
-    setIncome(
-      calculateMonthlyTrend(
-        paychecks.map((p) => ({ occurredOn: p.pay_date, amountCents: p.amount_cents })),
-        MONTHS_BACK
-      )
-    );
-    setExpenses(
-      calculateMonthlyTrend(
-        [
-          ...billPayments.map((p) => ({ occurredOn: p.paid_on, amountCents: p.amount_cents })),
-          ...debtPayments.map((p) => ({ occurredOn: p.paid_on, amountCents: p.amount_cents })),
-        ],
-        MONTHS_BACK
-      )
-    );
-    setIsLoading(false);
-  }, [status, user]);
+  const now = new Date();
+  const range = {
+    fromDate: formatLocalDate(new Date(now.getFullYear(), now.getMonth() - (MONTHS_BACK - 1), 1)),
+    toDate: monthDateRange(now.getFullYear(), now.getMonth()).toDate,
+  };
+  const data = useReportData(range, canView);
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload])
+  const income = calculateMonthlyTrend(
+    data.incomeEntries.map((e) => ({ occurredOn: e.date, amountCents: e.amountCents })),
+    MONTHS_BACK
+  );
+  // "Went out" here is bills + debt + groceries — goal deposits move money
+  // between your own pockets, so they're not counted as spending.
+  const expenses = calculateMonthlyTrend(
+    data.entries.map((e) => ({ occurredOn: e.date, amountCents: e.amountCents })),
+    MONTHS_BACK
   );
 
   const maxCents = Math.max(
@@ -65,71 +52,95 @@ export default function ReportIncomeExpensesScreen() {
     ...expenses.map((m) => m.totalCents),
     1
   );
-  const hasAnyData = income.some((m) => m.totalCents > 0) || expenses.some((m) => m.totalCents > 0);
+  const totalIn = income.reduce((sum, m) => sum + m.totalCents, 0);
+  const totalOut = expenses.reduce((sum, m) => sum + m.totalCents, 0);
+  const hasAnyData = totalIn > 0 || totalOut > 0;
 
   return (
-    <Screen>
-      <ThemedText themeColor="textSecondary">Last {MONTHS_BACK} months</ThemedText>
+    <Screen showGuestBanner>
+      <Stack.Screen options={{ title: 'Income vs. expenses' }} />
+      <ScreenHeader
+        title="Income vs. expenses"
+        subtitle={`The last ${MONTHS_BACK} months, month by month.`}
+      />
 
-      <View style={{ flexDirection: 'row', gap: Space[4] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[1] }}>
-          <View
-            style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.success }}
-          />
-          <ThemedText type="small">Income</ThemedText>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[1] }}>
-          <View
-            style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.warning }}
-          />
-          <ThemedText type="small">Expenses</ThemedText>
-        </View>
-      </View>
-
-      {isLoading ? (
-        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      {isGateLoading || data.isLoading ? (
+        <Card>
+          <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+        </Card>
+      ) : !canView ? (
+        <LimitNotice
+          title="Full reports are on a higher plan"
+          reason={gate?.reason ?? "We couldn't check your plan just now. Please try again."}
+        />
+      ) : data.errorMessage ? (
+        <Card style={{ gap: Space[3] }}>
+          <ThemedText themeColor="warning">{data.errorMessage}</ThemedText>
+          <View style={{ flexDirection: 'row' }}>
+            <Button label="Try again" variant="secondary" onPress={data.refresh} />
+          </View>
+        </Card>
       ) : !hasAnyData ? (
         <EmptyState
+          mascot
           title="Nothing recorded yet"
-          message="Log a paycheck and record a bill or debt payment to see the trend build up here."
+          message="Log a paycheck and record a bill, debt payment or grocery receipt to see the trend build up here."
         />
       ) : (
-        income.map((month, index) => {
-          const expenseMonth = expenses[index];
-          const net = month.totalCents - (expenseMonth?.totalCents ?? 0);
-          return (
-            <SectionCard
-              key={month.month}
-              title={month.month}
-              action={
-                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                  {net >= 0 ? (
-                    <ThemedText type="smallBold" themeColor="success">
-                      +
-                    </ThemedText>
-                  ) : null}
-                  <CurrencyText
-                    cents={net}
-                    size="row"
-                    themeColor={net >= 0 ? 'success' : 'danger'}
-                  />
+        <>
+          <Grid>
+            <StatTile
+              label="Came in"
+              valueCents={totalIn}
+              glyph="↗"
+              glyphColor="success"
+              glyphTint="successMuted"
+              description={`Paychecks over ${MONTHS_BACK} months.`}
+            />
+            <StatTile
+              label="Went out"
+              valueCents={totalOut}
+              glyph="≡"
+              glyphColor="warning"
+              glyphTint="warningMuted"
+              description="Bills, debt and groceries."
+            />
+          </Grid>
+
+          {income.map((month, index) => {
+            const out = expenses[index]?.totalCents ?? 0;
+            const net = month.totalCents - out;
+            return (
+              <SectionCard
+                key={month.month}
+                title={formatMonthKey(month.month)}
+                action={
+                  <ThemedText type="smallBold" themeColor={net >= 0 ? 'success' : 'warning'}>
+                    {net >= 0 ? 'Left over ' : 'Ahead of income by '}
+                    {formatCents(Math.abs(net))}
+                  </ThemedText>
+                }
+              >
+                <View style={{ gap: Space[3] }}>
+                  <View style={{ gap: Space[1] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <ThemedText type="small">Came in</ThemedText>
+                      <ThemedText type="smallBold">{formatCents(month.totalCents)}</ThemedText>
+                    </View>
+                    <ProgressBar percent={(month.totalCents / maxCents) * 100} tone="success" />
+                  </View>
+                  <View style={{ gap: Space[1] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <ThemedText type="small">Went out</ThemedText>
+                      <ThemedText type="smallBold">{formatCents(out)}</ThemedText>
+                    </View>
+                    <ProgressBar percent={(out / maxCents) * 100} tone="watch" />
+                  </View>
                 </View>
-              }
-            >
-              <View style={{ gap: Space[2] }}>
-                <ProgressBar percent={(month.totalCents / maxCents) * 100} tone="success" />
-                <ProgressBar
-                  percent={((expenseMonth?.totalCents ?? 0) / maxCents) * 100}
-                  tone="watch"
-                />
-                <ThemedText type="small" themeColor="textSecondary">
-                  {formatCents(month.totalCents)} in · {formatCents(expenseMonth?.totalCents ?? 0)}{' '}
-                  out
-                </ThemedText>
-              </View>
-            </SectionCard>
-          );
-        })
+              </SectionCard>
+            );
+          })}
+        </>
       )}
     </Screen>
   );

@@ -1,101 +1,77 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
-import { formatCents, type BillStatus } from '@own-my-budget/core';
+import { View } from 'react-native';
 
+import { CashFlowCard } from '@/components/dashboard/cash-flow-card';
+import { COLUMN_STYLE } from '@/components/dashboard/common';
+import { CategorySpendingCard } from '@/components/dashboard/category-spending-card';
+import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { DebtProgressCard, QuickActionsCard } from '@/components/dashboard/debt-and-actions';
+import { MONTH_NAMES } from '@/components/dashboard/format';
+import { GoalsCard } from '@/components/dashboard/goals-card';
+import { HealthCard } from '@/components/dashboard/health-card';
+import { InsightsCard, MissionsCard, TipCard } from '@/components/dashboard/insight-cards';
+import { NextPaycheckCard } from '@/components/dashboard/next-paycheck-card';
+import { SnapshotGrid } from '@/components/dashboard/snapshot-grid';
+import { SummaryCards } from '@/components/dashboard/summary-cards';
+import { UpcomingBillsCard } from '@/components/dashboard/upcoming-bills-card';
+import { useDashboardData } from '@/components/dashboard/use-dashboard-data';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar } from '@/components/ui/avatar';
-import { BillRow } from '@/components/ui/bill-row';
-import { BudgetHealthGauge } from '@/components/ui/budget-health-gauge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { GreetingHero } from '@/components/ui/greeting-hero';
-import { Grid } from '@/components/ui/grid';
-import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
-import { SectionCard } from '@/components/ui/section-card';
-import { StatTile } from '@/components/ui/stat-tile';
-import { StatusPill, type StatusTone } from '@/components/ui/status-pill';
 import { useAuth } from '@/contexts/auth-context';
-import { useDashboardData } from '@/hooks/use-dashboard-data';
-import { supabase } from '@/lib/supabase';
+import { Radius, Space } from '@/constants/theme';
 import { rescheduleAllNotifications } from '@/lib/notifications';
-import { Space } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/hooks/use-theme';
 
-const BILL_STATUS_TONE: Record<BillStatus, StatusTone> = {
-  paid: 'success',
-  upcoming: 'neutral',
-  overdue: 'warning', // amber, never red — PLAN.md's "never shame" rule
-};
-
-const BILL_STATUS_LABEL: Record<BillStatus, string> = {
-  paid: 'Paid',
-  upcoming: 'Upcoming',
-  overdue: 'Watch this',
-};
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-export default function HomeScreen() {
+export default function DashboardScreen() {
+  const theme = useTheme();
   const { status, user } = useAuth();
   const data = useDashboardData();
+  const { model } = data;
+  const periodLabel = `${MONTH_NAMES[data.month]} ${data.year}`;
 
   useEffect(() => {
     if (status !== 'signedIn' || !user) return;
     // Keeps scheduled bill/payday reminders in sync with current data.
-    // Best-effort: a failure here (permission denied, etc.) must never
-    // break the Home screen itself.
+    // Best-effort: a failure here must never break the Dashboard itself.
     rescheduleAllNotifications(supabase, user.id).catch(() => {});
   }, [status, user]);
 
-  const maxCashFlowCents = Math.max(data.cashFlow.incomeCents, data.cashFlow.spendingCents, 1);
-
   return (
     <Screen showGuestBanner>
-      <GreetingHero
-        eyebrow="Dashboard"
-        title={`Hello, ${data.displayName || 'there'}`}
-        subtitle="Here's a clear look at your money right now."
-        action={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[2] }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Refresh"
-              onPress={data.refresh}
-              hitSlop={8}
-            >
-              <ThemedText style={{ fontSize: 18 }}>⟳</ThemedText>
-            </Pressable>
-            <MonthYearStepper
-              month={data.selectedMonth}
-              year={data.selectedYear}
-              onMonthChange={data.setSelectedMonth}
-              onYearChange={data.setSelectedYear}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Settings"
-              onPress={() => router.push('/settings')}
-            >
-              <Avatar name={data.displayName} />
-            </Pressable>
-            <Button label="+ Add Transaction" onPress={() => router.push('/add-transaction')} />
-          </View>
-        }
+      <DashboardHeader
+        displayName={model.displayName}
+        month={data.month}
+        year={data.year}
+        onMonthChange={data.setMonth}
+        onYearChange={data.setYear}
+        onRefresh={data.refresh}
       />
+
+      {data.errorMessage ? (
+        <View
+          accessibilityRole="alert"
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: Space[3],
+            backgroundColor: theme.warningMuted,
+            borderRadius: Radius.input,
+            paddingVertical: Space[3],
+            paddingHorizontal: Space[4],
+          }}
+        >
+          <ThemedText type="smallBold" themeColor="warning" style={{ flexShrink: 1 }}>
+            {data.errorMessage}
+          </ThemedText>
+          <Button label="Dismiss" variant="quiet" onPress={data.clearError} />
+        </View>
+      ) : null}
 
       {data.isLoading ? (
         <Card>
@@ -103,242 +79,140 @@ export default function HomeScreen() {
         </Card>
       ) : (
         <>
-          {data.hasNoData && (
-            <Card style={{ gap: Space[1] }}>
-              <ThemedText type="smallBold">Let&rsquo;s build your budget picture</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Add your income and your first bill — the cards below will fill in with your real
-                numbers as you go.
+          {model.isEmpty ? (
+            <Card style={{ alignItems: 'center', gap: Space[2], padding: Space[7] }}>
+              <ThemedText type="smallBold" style={{ fontSize: 17 }}>
+                Let&rsquo;s build your budget picture
               </ThemedText>
-              <View style={{ flexDirection: 'row', gap: Space[2] }}>
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                style={{ textAlign: 'center', maxWidth: 420 }}
+              >
+                Add your income and monthly bills to see your complete budget picture.
+              </ThemedText>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: Space[2],
+                  marginTop: Space[2],
+                }}
+              >
                 <Button
                   label="Add income"
-                  variant="panel"
+                  shape="rounded"
                   onPress={() => router.push('/add-income')}
                 />
                 <Button
                   label="Add a bill"
-                  variant="secondary"
+                  variant="outline"
+                  shape="rounded"
                   onPress={() => router.push('/add-bill')}
                 />
               </View>
             </Card>
-          )}
+          ) : null}
 
-          <Grid>
-            <StatTile
-              label="Total Income"
-              valueCents={data.cashFlow.incomeCents}
-              glyph="↗"
-              glyphColor="primary"
-              glyphTint="primaryMuted"
-              description="Take-home pay this month."
-            />
-            <StatTile
-              label="Bills and Payments"
-              valueCents={data.unpaidBillsCents}
-              glyph="≡"
-              glyphColor="textSecondary"
-              glyphTint="backgroundSelected"
-              description={
-                data.billsTotalCount > 0
-                  ? `${data.billsPaidCount} of ${data.billsTotalCount} bills paid — what's left to pay.`
-                  : 'Add a bill to start tracking what you owe.'
-              }
-            />
-            <StatTile
-              label="Savings"
-              valueCents={data.savingsTotalCents}
-              glyph="◆"
-              glyphColor="success"
-              glyphTint="successMuted"
-              description="Total saved across your goals."
-            />
-            <StatTile
-              label="Money Available"
-              valueCents={data.moneyLeftToSpendCents}
-              glyph="●"
-              glyphColor="accent"
-              glyphTint="accentMuted"
-              description="What's left after bills, debt, and spending."
-              emphasize
-            />
-          </Grid>
+          <SummaryCards
+            cards={[
+              {
+                label: 'Total Income',
+                cents: model.income.cents,
+                glyph: '↗',
+                glyphColor: 'solidAccent',
+                glyphTint: 'accentMuted',
+                note: model.income.change,
+                help: 'Take-home pay expected from your pay schedules this month.',
+              },
+              {
+                label: 'Bills and Payments',
+                cents: model.billsAndPayments.cents,
+                glyph: '≡',
+                glyphColor: 'text',
+                glyphTint: 'backgroundSelected',
+                note: {
+                  text: `${model.billsAndPayments.paidCount} of ${model.billsAndPayments.totalCount} bills paid`,
+                  tone: 'neutral',
+                },
+                help: 'Everything due this month across bills, cards and loans.',
+              },
+              {
+                label: 'Savings',
+                cents: model.savings.cents,
+                glyph: '◆',
+                glyphColor: 'success',
+                glyphTint: 'successMuted',
+                note: model.savings.change,
+                help: 'Money you moved into savings goals this month.',
+              },
+              {
+                label: 'Money Available',
+                cents: model.available.cents,
+                glyph: '●',
+                glyphColor: 'primary',
+                glyphTint: 'primaryMuted',
+                note: model.available.change,
+                help: 'What is left after bills, debt, spending and savings.',
+              },
+            ]}
+          />
 
-          <Grid>
-            <View style={{ flexGrow: 1, flexBasis: 320 }}>
-              <SectionCard
-                title="Monthly Cash Flow"
-                action={
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {MONTH_NAMES[data.selectedMonth]} {data.selectedYear}
-                  </ThemedText>
-                }
-              >
-                <View style={{ gap: Space[2] }}>
-                  <ProgressBar
-                    percent={(data.cashFlow.incomeCents / maxCashFlowCents) * 100}
-                    tone="success"
-                  />
-                  <ProgressBar
-                    percent={(data.cashFlow.spendingCents / maxCashFlowCents) * 100}
-                    tone="watch"
-                  />
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatCents(data.cashFlow.incomeCents)} in ·{' '}
-                    {formatCents(data.cashFlow.spendingCents)} out
-                  </ThemedText>
-                </View>
-              </SectionCard>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+              gap: Space[5],
+            }}
+          >
+            <View style={COLUMN_STYLE}>
+              <CashFlowCard
+                periodLabel={periodLabel}
+                cashFlow={model.cashFlow}
+                chartBars={model.chartBars}
+              />
+              <UpcomingBillsCard bills={model.upcomingBills} />
+              <CategorySpendingCard
+                rows={model.categoryRows}
+                periodLabel={periodLabel}
+                onSavePlanned={data.savePlanned}
+                onSaveActual={data.saveActual}
+              />
             </View>
-            <View style={{ flexGrow: 1, flexBasis: 320 }}>
-              <BudgetHealthGauge health={data.budgetHealth} />
+            <View style={COLUMN_STYLE}>
+              <HealthCard
+                health={model.health}
+                change={model.healthChange}
+                improveTips={model.improveTips}
+              />
+              <SnapshotGrid cards={model.snapshots} />
+              <TipCard tips={model.tips} />
+              <MissionsCard missions={model.missions} />
+              <InsightsCard insights={model.insights} />
             </View>
-          </Grid>
+          </View>
 
-          {data.nextPaycheck && (
-            <SectionCard title="Next paycheck">
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-end',
-                }}
-              >
-                <View>
-                  <ThemedText type="amountSmall">
-                    {formatCents(data.nextPaycheck.amountCents)}
-                  </ThemedText>
-                  <ThemedText themeColor="textSecondary" type="small">
-                    {data.nextPaycheck.label}
-                  </ThemedText>
-                </View>
-                <ThemedText themeColor="textSecondary" type="small">
-                  {data.nextPaycheck.payDate}
-                </ThemedText>
-              </View>
-            </SectionCard>
-          )}
+          <GoalsCard goals={model.goals} />
 
-          {data.billsNeedingAttention.length > 0 && (
-            <SectionCard title="Bills that need attention">
-              <View style={{ gap: Space[4] }}>
-                {data.billsNeedingAttention.map((bill) => (
-                  <BillRow
-                    key={bill.id}
-                    label={bill.label}
-                    caption={`Due ${bill.dueDate}`}
-                    amountCents={bill.amountCents}
-                    trailing={
-                      <StatusPill
-                        label={BILL_STATUS_LABEL[bill.status]}
-                        tone={BILL_STATUS_TONE[bill.status]}
-                      />
-                    }
-                  />
-                ))}
-              </View>
-            </SectionCard>
-          )}
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: Space[5] }}
+          >
+            <View style={{ ...COLUMN_STYLE, flexBasis: 320 }}>
+              <DebtProgressCard progress={model.debtProgress} strategy={model.strategy} />
+            </View>
+            <View style={{ ...COLUMN_STYLE, flexBasis: 320 }}>
+              <QuickActionsCard
+                firstUnpaidBillId={model.firstUnpaidBillId}
+                firstUnpaidBillCents={model.firstUnpaidBillCents}
+                firstGoalId={model.firstGoalId}
+              />
+            </View>
+          </View>
 
-          <SectionCard title="Quick actions">
-            <Grid gap={Space[2]}>
-              <View style={{ flexGrow: 1, flexBasis: 150 }}>
-                <Button
-                  label="+ Add bill"
-                  variant="secondary"
-                  onPress={() => router.push('/add-bill')}
-                />
-              </View>
-              <View style={{ flexGrow: 1, flexBasis: 150 }}>
-                <Button
-                  label="+ Add income"
-                  variant="secondary"
-                  onPress={() => router.push('/add-income')}
-                />
-              </View>
-              <View style={{ flexGrow: 1, flexBasis: 150 }}>
-                <Button
-                  label="+ Add goal"
-                  variant="secondary"
-                  onPress={() => router.push('/add-savings-goal')}
-                />
-              </View>
-            </Grid>
-          </SectionCard>
+          <NextPaycheckCard paycheck={model.nextPaycheck} />
         </>
       )}
     </Screen>
-  );
-}
-
-function MonthYearStepper({
-  month,
-  year,
-  onMonthChange,
-  onYearChange,
-}: {
-  month: number;
-  year: number;
-  onMonthChange: (month: number) => void;
-  onYearChange: (year: number) => void;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', gap: Space[1] }}>
-      <Stepper
-        label={MONTH_NAMES[month]}
-        onPrev={() => onMonthChange(month === 0 ? 11 : month - 1)}
-        onNext={() => onMonthChange(month === 11 ? 0 : month + 1)}
-      />
-      <Stepper
-        label={String(year)}
-        onPrev={() => onYearChange(year - 1)}
-        onNext={() => onYearChange(year + 1)}
-      />
-    </View>
-  );
-}
-
-function Stepper({
-  label,
-  onPrev,
-  onNext,
-}: {
-  label: string;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Space[1],
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        borderRadius: Space[3],
-        paddingHorizontal: Space[2],
-        paddingVertical: Space[1],
-      }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Previous ${label}`}
-        onPress={onPrev}
-        hitSlop={6}
-      >
-        <ThemedText type="small">‹</ThemedText>
-      </Pressable>
-      <ThemedText type="small" style={{ minWidth: 34, textAlign: 'center' }}>
-        {label}
-      </ThemedText>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Next ${label}`}
-        onPress={onNext}
-        hitSlop={6}
-      >
-        <ThemedText type="small">›</ThemedText>
-      </Pressable>
-    </View>
   );
 }

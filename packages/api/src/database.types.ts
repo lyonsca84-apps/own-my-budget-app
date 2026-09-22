@@ -578,6 +578,7 @@ export type Database = {
       goal_activity: {
         Row: {
           amount_cents: number;
+          challenge_week: number | null;
           created_at: string;
           goal_id: string;
           id: string;
@@ -588,6 +589,7 @@ export type Database = {
         };
         Insert: {
           amount_cents: number;
+          challenge_week?: number | null;
           created_at?: string;
           goal_id: string;
           id?: string;
@@ -598,6 +600,7 @@ export type Database = {
         };
         Update: {
           amount_cents?: number;
+          challenge_week?: number | null;
           created_at?: string;
           goal_id?: string;
           id?: string;
@@ -1212,31 +1215,43 @@ export type Database = {
       };
       savings_challenges: {
         Row: {
+          block_notes: Json;
           cadence: string;
           challenge_type: string;
           created_at: string;
           goal_id: string | null;
           id: string;
+          multiplier: number;
+          notes: string | null;
+          start_date: string | null;
           total_weeks: number;
           updated_at: string;
           user_id: string;
         };
         Insert: {
+          block_notes?: Json;
           cadence?: string;
           challenge_type?: string;
           created_at?: string;
           goal_id?: string | null;
           id?: string;
+          multiplier?: number;
+          notes?: string | null;
+          start_date?: string | null;
           total_weeks?: number;
           updated_at?: string;
           user_id: string;
         };
         Update: {
+          block_notes?: Json;
           cadence?: string;
           challenge_type?: string;
           created_at?: string;
           goal_id?: string | null;
           id?: string;
+          multiplier?: number;
+          notes?: string | null;
+          start_date?: string | null;
           total_weeks?: number;
           updated_at?: string;
           user_id?: string;
@@ -1260,36 +1275,60 @@ export type Database = {
       };
       savings_goals: {
         Row: {
+          account_label: string | null;
           archived_at: string | null;
+          category: string | null;
+          color: string | null;
           created_at: string;
+          frequency: string;
           id: string;
           is_challenge: boolean;
           label: string;
+          notes: string | null;
+          paused_at: string | null;
+          planned_deposit_cents: number | null;
           saved_cents: number;
+          start_date: string | null;
           target_cents: number;
           target_date: string | null;
           updated_at: string;
           user_id: string;
         };
         Insert: {
+          account_label?: string | null;
           archived_at?: string | null;
+          category?: string | null;
+          color?: string | null;
           created_at?: string;
+          frequency?: string;
           id?: string;
           is_challenge?: boolean;
           label: string;
+          notes?: string | null;
+          paused_at?: string | null;
+          planned_deposit_cents?: number | null;
           saved_cents?: number;
+          start_date?: string | null;
           target_cents: number;
           target_date?: string | null;
           updated_at?: string;
           user_id: string;
         };
         Update: {
+          account_label?: string | null;
           archived_at?: string | null;
+          category?: string | null;
+          color?: string | null;
           created_at?: string;
+          frequency?: string;
           id?: string;
           is_challenge?: boolean;
           label?: string;
+          notes?: string | null;
+          paused_at?: string | null;
+          planned_deposit_cents?: number | null;
           saved_cents?: number;
+          start_date?: string | null;
           target_cents?: number;
           target_date?: string | null;
           updated_at?: string;
@@ -1479,6 +1518,60 @@ export type Database = {
           user_id: string;
         };
       };
+      delete_goal_activity: {
+        Args: {
+          p_activity_id: string;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
+      record_challenge_week: {
+        Args: {
+          p_amount_cents: number;
+          p_goal_id: string;
+          p_occurred_on: string;
+          p_week: number;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
+      update_goal_activity: {
+        Args: {
+          p_activity_id: string;
+          p_amount_cents: number;
+          p_note: string;
+          p_occurred_on: string;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
       record_goal_activity: {
         Args: {
           p_amount_cents: number;
@@ -1489,6 +1582,7 @@ export type Database = {
         };
         Returns: {
           amount_cents: number;
+          challenge_week: number | null;
           created_at: string;
           goal_id: string;
           id: string;

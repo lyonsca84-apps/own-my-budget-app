@@ -10,12 +10,10 @@ import { Space } from '@/constants/theme';
 export interface MissionRowProps {
   mission: MissionStatus;
   onComplete: () => void;
-  /** Guests can look but not change anything. */
-  disabled?: boolean;
 }
 
-/** A Budget Mission: title, percent, progress bar, and either "Mark complete", a Done pill, or an "auto-tracked" note. */
-export function MissionRow({ mission, onComplete, disabled }: MissionRowProps) {
+/** A Budget Mission: title, percent, progress bar, and either a "Done" pill or a "Mark complete" button. */
+export function MissionRow({ mission, onComplete }: MissionRowProps) {
   return (
     <View
       style={{
@@ -25,7 +23,7 @@ export function MissionRow({ mission, onComplete, disabled }: MissionRowProps) {
         gap: Space[3],
       }}
     >
-      <View style={{ flexGrow: 1, flexBasis: 220, gap: Space[2] }}>
+      <View style={{ flexGrow: 1, flexBasis: 240, gap: Space[2] }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Space[3] }}>
           <ThemedText type="smallBold" style={{ flexShrink: 1 }}>
             {mission.title}
@@ -39,19 +37,20 @@ export function MissionRow({ mission, onComplete, disabled }: MissionRowProps) {
           {mission.description}
         </ThemedText>
       </View>
-      {mission.done ? (
-        <StatusPill label="Done" tone="success" />
-      ) : mission.manual ? (
-        <Button
-          label="Mark complete"
-          variant="secondary"
-          onPress={onComplete}
-          disabled={disabled}
-          accessibilityLabel={`Mark complete: ${mission.title}`}
-        />
-      ) : (
-        <StatusPill label="Tracked automatically" tone="neutral" />
-      )}
+      <View style={{ minWidth: 132, alignItems: 'flex-end' }}>
+        {mission.done ? (
+          <StatusPill label="Done" tone="success" />
+        ) : (
+          <Button
+            label="Mark complete"
+            variant="soft"
+            size="sm"
+            shape="rounded"
+            onPress={onComplete}
+            accessibilityLabel={`Mark complete: ${mission.title}`}
+          />
+        )}
+      </View>
     </View>
   );
 }

@@ -84,6 +84,24 @@ export const Colors = {
     dangerSolid: '#DC2626',
     dangerMuted: '#FDECEA',
 
+    // Clay — the rust used for genuinely overdue / destructive states
+    // ("Overdue", "Behind Schedule", Delete). Deliberately not red. `clay` is
+    // for text and icons, `clayMuted` a tint behind it; #A8431B clears 5.6:1
+    // on the page and 6:1 against white text when used as a fill.
+    clay: '#A8431B',
+    clayMuted: '#F9EAE2',
+
+    // Solid status fills for filled pills / chips. Each holds AA (4.5:1) with
+    // `onSolid` text, in both themes, so the filled look needs no per-theme
+    // variants: Paid=success, Due=warning (mustard), Partial=info (blue),
+    // Overdue/Behind Schedule=danger (clay), On Track=accent (teal).
+    solidSuccess: '#1E7A3C',
+    solidWarning: '#7A5D00',
+    solidInfo: '#0A5FD6',
+    solidDanger: '#A8431B',
+    solidAccent: '#00758F',
+    onSolid: '#FFFFFF',
+
     budgetBuddy: '#01ACD3',
     budgetBuddyMuted: '#E1F6FB',
   },
@@ -124,6 +142,16 @@ export const Colors = {
     danger: '#F87171',
     dangerSolid: '#EF4444',
     dangerMuted: '#3F1414',
+
+    clay: '#F09A78',
+    clayMuted: '#3D2016',
+
+    solidSuccess: '#1E7A3C',
+    solidWarning: '#7A5D00',
+    solidInfo: '#0A5FD6',
+    solidDanger: '#A8431B',
+    solidAccent: '#00758F',
+    onSolid: '#FFFFFF',
 
     budgetBuddy: '#5FCDE4',
     budgetBuddyMuted: '#123D47',
@@ -268,6 +296,8 @@ export const Layout = {
   sectionGap: Space[12],
   contentMaxWidth: 1360,
   sidebarWidth: 264,
+  /** Below this window width the sidebar collapses into a bottom tab bar and dialogs become full-height sheets. */
+  sidebarBreakpoint: 900,
 } as const;
 
 export const Motion = {

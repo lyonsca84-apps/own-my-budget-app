@@ -80,7 +80,7 @@ export async function archiveBill(client: TypedSupabaseClient, billId: string): 
   if (error) throw error;
 }
 
-/** One planned slice of a bill or debt payment, assigned to a payday (pay schedule + date). */
+/** One planned slice of a bill, debt or savings-goal payment, assigned to a payday (pay schedule + date). */
 export interface PaydayPlanPortion {
   incomeSourceId: string;
   /** YYYY-MM-DD */
@@ -89,7 +89,7 @@ export interface PaydayPlanPortion {
 }
 
 /**
- * Replaces the whole "Plan payment" split for one bill or debt using the
+ * Replaces the whole "Plan payment" split for one bill, debt or savings goal using the
  * shared `payday_assignments` table (also read by the Budget view). New
  * portions are upserted first and stale ones deleted after, so a failure
  * part-way never leaves the target with its plan wiped. Portions that land
@@ -99,7 +99,7 @@ export interface PaydayPlanPortion {
 export async function replacePaydayPlan(
   client: TypedSupabaseClient,
   userId: string,
-  target: { type: 'bill' | 'debt'; id: string },
+  target: { type: 'bill' | 'debt' | 'savings_goal'; id: string },
   portions: PaydayPlanPortion[]
 ): Promise<void> {
   const merged = new Map<string, PaydayPlanPortion>();

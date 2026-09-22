@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/design-system/brand/app-icon.png",
     "scheme": "ownmybudget",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/design-system/brand/app-icon.png",
       "bundleIdentifier": "com.ownmybudget.app",

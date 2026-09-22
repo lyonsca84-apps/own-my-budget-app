@@ -1,58 +1,55 @@
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { formatCents } from '@own-my-budget/core';
+import { View } from 'react-native';
+import {
+  SAVINGS_ACTIVITY_LABELS,
+  filterSavingsActivity,
+  type SavingsActivityEvent,
+  type SavingsActivityFilter,
+} from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { SectionCard } from '@/components/ui/section-card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { formatShortDate } from '@/components/savings/format';
-import type { GoalActivityView } from '@/components/savings/use-savings-data';
+import { formatActivityDate, formatMoney } from '@/components/savings/format';
 import { Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type Filter = 'all' | 'deposits' | 'withdrawals' | 'challenges';
-
-const FILTERS: { value: Filter; label: string }[] = [
+const FILTERS: { value: SavingsActivityFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'deposits', label: 'Deposits' },
-  { value: 'withdrawals', label: 'Withdrawals' },
+  { value: 'goals', label: 'Goals' },
   { value: 'challenges', label: 'Challenges' },
 ];
 
-const PAGE = 8;
+const PAGE = 10;
 
-function typeLabel(entry: GoalActivityView) {
-  if (entry.kind === 'withdrawal') return 'Withdrawal';
-  return entry.isChallenge ? 'Challenge deposit' : 'Deposit';
-}
-
-/** Recent Savings Activity: every deposit/withdrawal across goals, filterable, newest first. */
-export function ActivitySection({ activity }: { activity: GoalActivityView[] }) {
+/** Recent Savings Activity: deposits, goals created/completed, challenge weeks and badges earned — filterable, newest first. */
+export function ActivitySection({ activity }: { activity: SavingsActivityEvent[] }) {
   const theme = useTheme();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<SavingsActivityFilter>('all');
   const [showAll, setShowAll] = useState(false);
 
-  const filtered = activity.filter((entry) => {
-    if (filter === 'deposits') return entry.kind === 'deposit';
-    if (filter === 'withdrawals') return entry.kind === 'withdrawal';
-    if (filter === 'challenges') return entry.isChallenge;
-    return true;
-  });
+  const filtered = filterSavingsActivity(activity, filter);
   const visible = showAll ? filtered : filtered.slice(0, PAGE);
 
   return (
-    <SectionCard title="Recent Savings Activity">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <SectionCard
+      title="Recent Savings Activity"
+      action={
         <SegmentedControl
           options={FILTERS}
           value={filter}
+          variant="chips"
+          size="sm"
+          accessibilityLabel="Filter savings activity"
           onChange={(value) => {
             setFilter(value);
             setShowAll(false);
           }}
         />
-      </ScrollView>
+      }
+    >
       {visible.length === 0 ? (
         <ThemedText themeColor="textSecondary" style={{ textAlign: 'center', paddingVertical: 24 }}>
           No recent savings activity.
@@ -66,34 +63,33 @@ export function ActivitySection({ activity }: { activity: GoalActivityView[] }) 
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: Space[2],
+                gap: Space[3],
                 paddingVertical: Space[3],
                 borderTopWidth: index === 0 ? 0 : 1,
                 borderTopColor: theme.border,
               }}
             >
-              <View style={{ flexShrink: 1 }}>
-                <ThemedText type="smallBold">{entry.goalTitle}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {typeLabel(entry)} · {formatShortDate(entry.occurredOn)}
-                  {entry.note ? ` · ${entry.note}` : ''}
-                </ThemedText>
-              </View>
-              <ThemedText
-                type="amountSmall"
-                themeColor={entry.kind === 'withdrawal' ? 'textSecondary' : 'text'}
-              >
-                {entry.kind === 'withdrawal' ? '−' : '+'}
-                {formatCents(entry.amountCents)}
+              <ThemedText type="small" themeColor="textSecondary" style={{ flexShrink: 1 }}>
+                <ThemedText type="smallBold">{entry.title}</ThemedText>
+                {' · '}
+                {SAVINGS_ACTIVITY_LABELS[entry.kind]}
+                {' · '}
+                {formatActivityDate(entry.date)}
+                {entry.note && entry.kind !== 'challengeDeposit' ? ` · ${entry.note}` : ''}
               </ThemedText>
+              {entry.amountCents !== null && entry.kind !== 'goalCompleted' ? (
+                <ThemedText type="smallBold">
+                  {entry.kind === 'withdrawal' ? '−' : ''}
+                  {formatMoney(entry.amountCents)}
+                </ThemedText>
+              ) : null}
             </View>
           ))}
-          {!showAll && filtered.length > PAGE ? (
+          {filtered.length > PAGE ? (
             <Button
-              label={`Show all ${filtered.length}`}
+              label={showAll ? 'Show fewer' : `Show all ${filtered.length}`}
               variant="quiet"
-              onPress={() => setShowAll(true)}
+              onPress={() => setShowAll((current) => !current)}
             />
           ) : null}
         </View>

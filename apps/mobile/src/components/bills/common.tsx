@@ -1,14 +1,18 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View, type LayoutChangeEvent } from 'react-native';
 import { formatCents } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Fonts, Layout, Radius, Space } from '@/constants/theme';
+import { Fonts, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { PlanSummary } from './use-bills-debt-data';
 
-/** "Assigned to paycheck: $250.00 across 2 paychecks" / "Not yet assigned to a paycheck". */
+/**
+ * "Assigned to paycheck: $250.00 across 2 paychecks" / "Assigned to paycheck:
+ * Not yet assigned to a paycheck" — the design's link-colored line under
+ * every card, loan and bill. Words, not just color.
+ */
 export function PlanLine({
   plan,
   label = 'Assigned to paycheck',
@@ -16,54 +20,30 @@ export function PlanLine({
   plan?: PlanSummary;
   label?: string;
 }) {
-  if (!plan || plan.paydayCount === 0) {
-    return (
-      <ThemedText type="small" themeColor="textSecondary">
-        Not yet assigned to a paycheck
-      </ThemedText>
-    );
-  }
+  const assigned = plan && plan.paydayCount > 0;
   return (
-    <ThemedText type="smallBold" themeColor="primary">
-      {label}: {formatCents(plan.totalCents)} across {plan.paydayCount}{' '}
-      {plan.paydayCount === 1 ? 'paycheck' : 'paychecks'}
+    <ThemedText type="smallBold" themeColor="solidAccent">
+      {label}:{' '}
+      {assigned
+        ? `${formatCents(plan.totalCents)} across ${plan.paydayCount} ${
+            plan.paydayCount === 1 ? 'paycheck' : 'paychecks'
+          }`
+        : 'Not yet assigned to a paycheck'}
     </ThemedText>
   );
 }
 
-/**
- * Outlined destructive-looking action. Uses the theme's danger color as a
- * text + border cue (with its own label — never color alone); the actual
- * confirmation happens inline in ConfirmRemove.
- */
+/** Outlined destructive action ("Delete card"); the real confirmation happens inline in ConfirmRemove. */
 export function DangerButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const theme = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Button
+      label={label}
+      variant="dangerOutline"
+      size="sm"
+      shape="rounded"
+      accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: Layout.minimumTouchTarget,
-        borderRadius: Radius.full,
-        paddingHorizontal: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: theme.danger,
-        opacity: pressed ? 0.82 : 1,
-      })}
-    >
-      <ThemedText
-        style={{
-          color: theme.danger,
-          fontFamily: Fonts.body.semibold,
-          fontSize: 17,
-          lineHeight: 24,
-        }}
-      >
-        {label}
-      </ThemedText>
-    </Pressable>
+    />
   );
 }
 
@@ -90,17 +70,22 @@ export function ConfirmRemove({
         gap: Space[3],
         padding: Space[4],
         borderRadius: Radius.smallCard,
-        backgroundColor: theme.backgroundSelected,
+        backgroundColor: theme.clayMuted,
       }}
     >
-      <ThemedText type="smallBold">Remove {name}?</ThemedText>
+      <ThemedText type="smallBold">Delete {name}?</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        This takes the {noun} off your lists. Your payment history is kept, and you can always add
-        it again.
+        This takes the {noun} off your lists. Your payment history is kept.
       </ThemedText>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-        <Button label="Keep it" variant="secondary" onPress={onCancel} />
-        <DangerButton label={`Remove ${noun}`} onPress={onConfirm} />
+        <Button label="Keep it" variant="soft" size="sm" shape="rounded" onPress={onCancel} />
+        <Button
+          label={`Yes, delete ${noun}`}
+          variant="danger"
+          size="sm"
+          shape="rounded"
+          onPress={onConfirm}
+        />
       </View>
     </View>
   );
@@ -124,6 +109,15 @@ export function PaidOffChip() {
       </ThemedText>
     </View>
   );
+}
+
+/** Whole-dollar display ("$1,481") for big figures on cards and tiles, where the design drops cents. */
+export function formatWholeDollars(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }
 
 export function formatDollarsInput(cents: number | null): string {
@@ -154,4 +148,52 @@ export function useSyncedText(source: string): [string, (value: string) => void]
     setText(source);
   }
   return [text, setText];
+}
+
+/**
+ * Measures the width available to a block, so grids can pick their column
+ * count from the space they actually get (the sidebar takes 264px on wide
+ * web) instead of the window width. `width` is 0 until first layout.
+ */
+export function useMeasuredWidth(): [number, (event: LayoutChangeEvent) => void] {
+  const [width, setWidth] = useState(0);
+  return [width, (event) => setWidth(Math.round(event.nativeEvent.layout.width))];
+}
+
+/**
+ * A grid of equal-width cells whose column count comes from the measured
+ * width: `minCell` is the narrowest a cell may get, `maxColumns` the widest
+ * the design allows (5 for summary tiles, 3 for the per-card grid).
+ */
+export function ResponsiveGrid({
+  children,
+  minCell,
+  maxColumns,
+  gap = Space[3],
+  align = 'stretch',
+}: {
+  children: ReactNode[];
+  minCell: number;
+  maxColumns: number;
+  gap?: number;
+  align?: 'stretch' | 'flex-start' | 'flex-end';
+}) {
+  const [width, onLayout] = useMeasuredWidth();
+  const columns =
+    width > 0 ? Math.max(1, Math.min(maxColumns, Math.floor((width + gap) / (minCell + gap)))) : 1;
+  const cell = width > 0 ? (width - gap * (columns - 1)) / columns : undefined;
+  return (
+    <View
+      onLayout={onLayout}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap, alignItems: align }}
+    >
+      {width > 0
+        ? children.map((child, index) => (
+            <View key={index} style={{ width: cell, minWidth: 0 }}>
+              {child}
+            </View>
+          ))
+        : null}
+    </View>
+  );
 }

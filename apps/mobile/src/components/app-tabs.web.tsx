@@ -1,7 +1,8 @@
 import type { ComponentProps, PropsWithChildren } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { router, type Href } from 'expo-router';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, TabList, TabTrigger, TabSlot, type TabTriggerSlotProps } from 'expo-router/ui';
 import { Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { getCurrentAccount } from '@own-my-budget/api';
@@ -13,9 +14,12 @@ import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS, WIDE_EXTRA_LINKS } from '@/constants/nav';
-import { Fonts, Layout, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, Fonts, Layout, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { BrandAssets } from '@/design-system/assets/brand';
 import { useTheme } from '@/hooks/use-theme';
+import { BudgetBuddyFab } from '@/components/helper/budget-buddy-fab';
+import { BudgetBuddyPanel } from '@/components/helper/budget-buddy-panel';
+import { useBudgetBuddyChat } from '@/components/helper/use-budget-buddy-chat';
 
 /** Fetches the signed-in user's plan tier — `null` for guests (no real entitlement to check) or while loading. */
 function usePlanTier(): PlanTier | null {
@@ -37,11 +41,27 @@ function usePlanTier(): PlanTier | null {
 }
 
 /** Below this width, the sidebar collapses into a bottom tab bar (mobile web). */
-const SIDEBAR_BREAKPOINT = 900;
+export const SIDEBAR_BREAKPOINT = Layout.sidebarBreakpoint;
 
 export default function AppTabs() {
   const { width } = useWindowDimensions();
   const isWide = width >= SIDEBAR_BREAKPOINT;
+  // Wide layouts get the design's floating chat panel; narrow ones open the
+  // full-screen helper route. The chat state lives here so closing the panel
+  // never loses the conversation.
+  const chat = useBudgetBuddyChat();
+  const { reloadGate } = chat;
+  const [helperOpen, setHelperOpen] = useState(false);
+  const openHelper = useCallback(() => {
+    if (isWide) {
+      setHelperOpen(true);
+      reloadGate();
+    } else {
+      router.push('/helper');
+    }
+  }, [isWide, reloadGate]);
+  const closeHelper = useCallback(() => setHelperOpen(false), []);
+  const panelOpen = isWide && helperOpen;
 
   return (
     <Tabs style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
@@ -50,7 +70,7 @@ export default function AppTabs() {
           NAV_ITEMS entry always gets a TabTrigger here regardless of layout;
           NavButton itself decides what's actually visible per layout. */}
       <TabList asChild>
-        <NavListChrome isWide={isWide}>
+        <NavListChrome isWide={isWide} onOpenHelper={openHelper}>
           {NAV_ITEMS.map((item) => (
             <TabTrigger key={item.name} name={item.name} href={item.href} asChild>
               <NavButton
@@ -68,13 +88,21 @@ export default function AppTabs() {
       </TabList>
       <View style={{ flex: 1, minHeight: 0 }}>
         <TabSlot style={{ flex: 1 }} />
-        <FloatingHelperButton />
+        {panelOpen ? <BudgetBuddyPanel chat={chat} onClose={closeHelper} /> : null}
+        <BudgetBuddyFab
+          expanded={isWide ? panelOpen : undefined}
+          onPress={panelOpen ? closeHelper : openHelper}
+        />
       </View>
     </Tabs>
   );
 }
 
-function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean }>) {
+export function NavListChrome({
+  isWide,
+  onOpenHelper,
+  children,
+}: PropsWithChildren<{ isWide: boolean; onOpenHelper: () => void }>) {
   const theme = useTheme();
 
   return (
@@ -123,7 +151,7 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
       <View
         style={
           isWide
-            ? { gap: Spacing.half }
+            ? { gap: Spacing.one }
             : { flexDirection: 'row', flex: 1, justifyContent: 'space-around' }
         }
       >
@@ -132,7 +160,7 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
 
       {isWide && (
         <View style={{ marginTop: 'auto', gap: Spacing.two }}>
-          <BudgetBuddyUpsellCard />
+          <BudgetBuddyUpsellCard onOpen={onOpenHelper} />
           <AccountSummary />
         </View>
       )}
@@ -141,9 +169,10 @@ function NavListChrome({ isWide, children }: PropsWithChildren<{ isWide: boolean
 }
 
 function AccountSummary() {
+  const theme = useTheme();
   const { status, user, exitGuestMode, signOut } = useAuth();
   const isGuest = status === 'guest';
-  const name = isGuest ? 'Guest mode' : (user?.email?.split('@')[0] ?? 'Account');
+  const name = isGuest ? 'Guest Mode' : (user?.email?.split('@')[0] ?? 'Account');
 
   const actionDescription = isGuest ? 'Demo data — tap to create an account' : 'Tap to log out';
 
@@ -161,19 +190,38 @@ function AccountSummary() {
       accessible
       accessibilityRole="button"
       accessibilityLabel={`${name}. ${actionDescription}`}
-      style={{
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: Spacing.two,
         padding: Spacing.two,
-        borderRadius: Spacing.three,
-      }}
+        borderRadius: Radius.input,
+        backgroundColor: theme.background,
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
-      <Avatar name={name} size={28} />
-      <View>
-        <ThemedText type="smallBold">{name}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {actionDescription}
+      {isGuest ? (
+        // Soft teal-to-green orb, per the design's guest block.
+        <LinearGradient
+          colors={[`${Brand.electricity}66`, `${Brand.ecology}80`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: 32, height: 32, borderRadius: 16 }}
+        />
+      ) : (
+        <Avatar name={name} size={32} />
+      )}
+      <View style={{ flexShrink: 1 }}>
+        <ThemedText type="smallBold" style={{ fontSize: 14, lineHeight: 18 }}>
+          {name}
+        </ThemedText>
+        <ThemedText
+          type="small"
+          themeColor="textSecondary"
+          style={{ fontSize: 13, lineHeight: 17 }}
+          numberOfLines={1}
+        >
+          {isGuest ? 'Demo data' : 'Log out'}
         </ThemedText>
       </View>
     </Pressable>
@@ -183,66 +231,51 @@ function AccountSummary() {
 /** Doubles as the sidebar's persistent entry point to the AI Helper (per the
  * approved design, Helper isn't a standard nav item on either layout). The
  * trial pitch only shows for accounts that aren't already on Budget Buddy. */
-function BudgetBuddyUpsellCard() {
+function BudgetBuddyUpsellCard({ onOpen }: { onOpen: () => void }) {
   const theme = useTheme();
   const plan = usePlanTier();
   const isBudgetBuddy = plan === 'budgetBuddy';
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Open Budget Buddy, your AI assistant"
-      onPress={() => router.push('/helper')}
+    // Teal-to-blue gradient card per the design, kept at the darker Solid
+    // stops so the white copy holds AA contrast.
+    <LinearGradient
+      colors={[theme.solidAccent, theme.solidInfo]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={{
-        backgroundColor: theme.budgetBuddy,
-        borderRadius: Spacing.four,
+        borderRadius: Radius.smallCard + 2,
         padding: Spacing.three,
         gap: Spacing.one,
       }}
     >
-      <ThemedText type="smallBold" themeColor="onPrimary">
+      <ThemedText type="smallBold" style={{ color: theme.onSolid, fontSize: 14, lineHeight: 20 }}>
         Meet Budget Buddy
       </ThemedText>
-      <ThemedText type="small" themeColor="onPrimary" style={{ opacity: 0.9 }}>
+      <ThemedText type="small" style={{ color: theme.onSolid, fontSize: 13, lineHeight: 18 }}>
         {isBudgetBuddy
           ? 'Your AI assistant for bills, receipts, and getting ahead.'
           : `Try it free for ${PLAN_PRICING.budgetBuddy.trialDays} days — your AI assistant for bills, receipts, and getting ahead.`}
       </ThemedText>
-    </Pressable>
-  );
-}
-
-/** Mobile-only equivalent of the sidebar's Budget Buddy card — a persistent
- * floating button reachable from every tab screen, matching the approved
- * design's floating AI helper affordance. */
-function FloatingHelperButton() {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Open Budget Buddy, your AI assistant"
-      onPress={() => router.push('/helper')}
-      style={{
-        position: 'absolute',
-        right: Spacing.four,
-        bottom: Spacing.four,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: theme.budgetBuddy,
-        alignItems: 'center',
-        justifyContent: 'center',
-        // Shadow-only emphasis for a floating control — never a border.
-        shadowColor: '#000',
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 6,
-      }}
-    >
-      <ThemedText style={{ color: theme.onPrimary, fontSize: 22 }}>✦</ThemedText>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open Budget Buddy, your AI assistant"
+        onPress={onOpen}
+        style={({ pressed }) => ({
+          marginTop: Spacing.two,
+          minHeight: 40,
+          borderRadius: Radius.chip + 2,
+          backgroundColor: theme.backgroundElement,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: pressed ? 0.88 : 1,
+        })}
+      >
+        <ThemedText type="smallBold" themeColor="primary">
+          {isBudgetBuddy ? 'Open Budget Buddy' : 'Try Budget Buddy'}
+        </ThemedText>
+      </Pressable>
+    </LinearGradient>
   );
 }
 
@@ -253,7 +286,7 @@ function ExtraNavLink({ label, href }: { label: string; href: Href }) {
       accessibilityLabel={label}
       onPress={() => router.push(href)}
       style={{
-        borderRadius: Spacing.three,
+        borderRadius: Radius.input,
         paddingVertical: Spacing.two,
         paddingHorizontal: Spacing.three,
         flexDirection: 'row',
@@ -262,14 +295,18 @@ function ExtraNavLink({ label, href }: { label: string; href: Href }) {
       }}
     >
       <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: 'transparent' }} />
-      <ThemedText type="default" themeColor="text" style={{ fontFamily: Fonts.body.regular }}>
+      <ThemedText
+        type="default"
+        themeColor="text"
+        style={{ fontFamily: Fonts.body.medium, fontSize: 16, lineHeight: 22 }}
+      >
         {label}
       </ThemedText>
     </Pressable>
   );
 }
 
-function NavButton({
+export function NavButton({
   label,
   isWide,
   isFocused,
@@ -292,7 +329,7 @@ function NavButton({
         accessibilityState={{ selected: isFocused }}
         accessibilityLabel={label}
         style={{
-          borderRadius: Spacing.three,
+          borderRadius: Radius.input,
           paddingVertical: Spacing.two,
           paddingHorizontal: Spacing.three,
           backgroundColor: isFocused ? theme.backgroundSelected : 'transparent',
@@ -312,7 +349,11 @@ function NavButton({
         <ThemedText
           type="default"
           themeColor={isFocused ? 'primary' : 'text'}
-          style={{ fontFamily: isFocused ? Fonts.body.semibold : Fonts.body.regular }}
+          style={{
+            fontFamily: isFocused ? Fonts.body.semibold : Fonts.body.medium,
+            fontSize: 16,
+            lineHeight: 22,
+          }}
         >
           {label}
         </ThemedText>

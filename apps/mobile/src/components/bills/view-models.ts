@@ -4,16 +4,17 @@ import {
   calculateDebtPaidPercent,
   deriveBillStatus,
   estimateMonthlyInterestCents,
+  isDebtBalanceKnown,
+  isDebtPaidOff,
   type BillStatus,
-  type DemoBill,
-  type DemoDebt,
 } from '@own-my-budget/core';
 
 /**
- * Screen-facing shapes for Bills & Debt. Real rows and guest demo data are
- * both normalized into these, so every sub-view renders one shape and never
- * cares where it came from. Columns added by migration 20260920100000 read as
- * `null` when the database hasn't been migrated yet.
+ * Screen-facing shapes for Bills & Debt. Rows (real or the guest sample
+ * database — both come through the same Supabase-compatible client) are
+ * normalized into these so every sub-view renders one shape. Columns added by
+ * migration 20260920100000 read as `null` when the database hasn't been
+ * migrated yet.
  */
 
 export type BillDisplayStatus = 'paid' | 'overdue' | 'partial' | 'due';
@@ -58,21 +59,6 @@ export function billItemFromRow(bill: BillWithPayments, today: Date): BillItem {
   };
 }
 
-export function billItemFromDemo(bill: DemoBill): BillItem {
-  const paidCents = bill.status === 'paid' ? bill.amountCents : 0;
-  return {
-    id: bill.id,
-    label: bill.label,
-    dueDate: bill.dueDate,
-    amountCents: bill.amountCents,
-    paidCents,
-    remainingCents: bill.amountCents - paidCents,
-    status: bill.status,
-    displayStatus: bill.status === 'paid' ? 'paid' : bill.status === 'overdue' ? 'overdue' : 'due',
-    reminderEnabled: true,
-  };
-}
-
 export interface DebtItem {
   id: string;
   label: string;
@@ -105,6 +91,8 @@ export interface DebtItem {
   /** 0-100 paid-down progress, or null with no basis to measure. */
   paidPercent: number | null;
   paidOff: boolean;
+  /** False for the "no balance entered yet" placeholder (0 stored, shown as —). */
+  balanceKnown: boolean;
   utilizationPercent: number | null;
   estMonthlyInterestCents: number;
 }
@@ -119,6 +107,7 @@ function finishDebt(
     | 'startingBalanceCents'
     | 'paidPercent'
     | 'paidOff'
+    | 'balanceKnown'
     | 'utilizationPercent'
     | 'estMonthlyInterestCents'
   > & { originalBalanceCents: number | null }
@@ -129,13 +118,24 @@ function finishDebt(
     ...rest,
     startingBalanceCents,
     paidPercent:
-      base.balanceCents <= 0 && startingBalanceCents > 0
+      base.balanceCents <= 0 &&
+      startingBalanceCents > 0 &&
+      (originalBalanceCents ?? 0) + base.totalPaidCents > 0
         ? 100
         : calculateDebtPaidPercent(
             originalBalanceCents ?? (base.totalPaidCents > 0 ? startingBalanceCents : null),
             base.balanceCents
           ),
-    paidOff: base.balanceCents <= 0,
+    paidOff: isDebtPaidOff({
+      balanceCents: base.balanceCents,
+      originalBalanceCents,
+      totalPaidCents: base.totalPaidCents,
+    }),
+    balanceKnown: isDebtBalanceKnown({
+      balanceCents: base.balanceCents,
+      originalBalanceCents,
+      totalPaidCents: base.totalPaidCents,
+    }),
     utilizationPercent:
       base.creditLimitCents && base.creditLimitCents > 0
         ? calculateCreditUtilization(base.balanceCents, base.creditLimitCents)
@@ -177,36 +177,6 @@ export function debtItemFromRow(row: DebtWithPayments, today: Date): DebtItem {
       .filter((p) => p.paidOn.startsWith(monthPrefix))
       .reduce((sum, p) => sum + p.amountCents, 0),
     payments,
-  });
-}
-
-export function debtItemFromDemo(debt: DemoDebt): DebtItem {
-  return finishDebt({
-    id: debt.id,
-    label: debt.label,
-    type: debt.type,
-    balanceCents: debt.balanceCents,
-    originalBalanceCents: null,
-    aprBasisPoints: debt.aprBasisPoints,
-    minimumPaymentCents: debt.minimumPaymentCents,
-    creditLimitCents: debt.creditLimitCents ?? null,
-    dueDay: null,
-    plannedPaymentCents: null,
-    notes: null,
-    issuer: null,
-    last4: null,
-    network: null,
-    cardStyle: null,
-    cardTextMode: 'auto',
-    promoBalanceCents: null,
-    promoAprBasisPoints: null,
-    promoExpiresOn: null,
-    lender: null,
-    termMonths: null,
-    startedOn: null,
-    totalPaidCents: 0,
-    paidThisMonthCents: 0,
-    payments: [],
   });
 }
 
@@ -270,4 +240,9 @@ export function longDate(iso: string): string {
 
 export function formatApr(basisPoints: number): string {
   return `${(basisPoints / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+}
+
+/** An account's APR, or `unknown` when none was entered (the database stores 0 for "not set"). */
+export function aprOrUnknown(basisPoints: number, unknown = '—'): string {
+  return basisPoints > 0 ? formatApr(basisPoints) : unknown;
 }

@@ -1,20 +1,8 @@
-import { useSyncExternalStore } from 'react';
-import { Appearance } from 'react-native';
-
-function subscribe(onChange: () => void) {
-  const listener = Appearance.addChangeListener(onChange);
-  return () => listener.remove();
-}
-
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web.
- * `useSyncExternalStore`'s server snapshot ('light') is what gets statically rendered; the client
- * snapshot then reconciles to the real OS scheme post-hydration, without a setState-in-effect.
+ * The app is light-mode only for now — see use-color-scheme.ts. Returning a
+ * constant also keeps the statically rendered HTML and the hydrated client
+ * identical, so there is no flash of the wrong palette.
  */
-export function useColorScheme() {
-  return useSyncExternalStore(
-    subscribe,
-    () => Appearance.getColorScheme() ?? 'light',
-    () => 'light'
-  );
+export function useColorScheme(): 'light' | 'dark' {
+  return 'light';
 }

@@ -62,8 +62,7 @@ export function CreditCardFace({
               width: 30,
               height: 30,
               borderRadius: Radius.chip,
-              borderWidth: 1.5,
-              borderColor: fg,
+              backgroundColor: fg === '#FFFFFF' ? 'rgba(255,255,255,0.28)' : 'rgba(0,18,40,0.14)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -92,9 +91,7 @@ export function CreditCardFace({
             width: 32,
             height: 24,
             borderRadius: 5,
-            borderWidth: 1.5,
-            borderColor: fg,
-            opacity: 0.7,
+            backgroundColor: fg === '#FFFFFF' ? 'rgba(255,255,255,0.35)' : 'rgba(0,18,40,0.18)',
           }}
         />
       </View>

@@ -4,6 +4,8 @@ import {
   calculatePayoffGoalPercent,
   calculatePayoffSchedule,
   estimateInterestPaid,
+  isDebtBalanceKnown,
+  isDebtPaidOff,
   monthsToPayOff,
   orderDebtsForStrategy,
   suggestedPromoPaymentCents,
@@ -212,5 +214,28 @@ describe('summarizePlanCoverage', () => {
       kind: 'over',
       overCents: 2_000,
     });
+  });
+});
+
+describe('isDebtPaidOff / isDebtBalanceKnown', () => {
+  it('treats a zero balance with no history as unknown, not paid off', () => {
+    const placeholder = { balanceCents: 0, originalBalanceCents: null, totalPaidCents: 0 };
+    expect(isDebtPaidOff(placeholder)).toBe(false);
+    expect(isDebtBalanceKnown(placeholder)).toBe(false);
+  });
+
+  it('counts a zero balance as paid off once there was a starting balance or a payment', () => {
+    expect(
+      isDebtPaidOff({ balanceCents: 0, originalBalanceCents: 50_000, totalPaidCents: 0 })
+    ).toBe(true);
+    expect(
+      isDebtPaidOff({ balanceCents: 0, originalBalanceCents: null, totalPaidCents: 100 })
+    ).toBe(true);
+  });
+
+  it('never calls an account with money owed paid off', () => {
+    const owing = { balanceCents: 1, originalBalanceCents: 50_000, totalPaidCents: 100 };
+    expect(isDebtPaidOff(owing)).toBe(false);
+    expect(isDebtBalanceKnown(owing)).toBe(true);
   });
 });

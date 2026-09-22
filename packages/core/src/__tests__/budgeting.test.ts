@@ -9,6 +9,9 @@ import {
   generatePaydays,
   buildBudgetRows,
   summarizeBudget,
+  budgetBarPercents,
+  splitIncomeLabel,
+  joinIncomeLabel,
 } from '../budgeting';
 
 describe('deriveBillStatus', () => {
@@ -306,5 +309,60 @@ describe('buildBudgetRows / summarizeBudget', () => {
       percentUsed: 107,
     });
     expect(summarizeBudget([]).percentUsed).toBeNull();
+  });
+});
+
+describe('budgetBarPercents', () => {
+  const rows = buildBudgetRows(
+    [
+      { id: 'h', name: 'Housing' },
+      { id: 'f', name: 'Food' },
+      { id: 'x', name: 'Extra' },
+    ],
+    [
+      { categoryId: 'h', plannedCents: 180_000, actualOverrideCents: null },
+      { categoryId: 'f', plannedCents: 60_000, actualOverrideCents: 90_000 },
+    ],
+    []
+  );
+
+  it('scales every row against the largest planned or actual amount', () => {
+    expect(budgetBarPercents(rows)).toEqual([
+      { categoryId: 'h', plannedPercent: 100, actualPercent: 0 },
+      { categoryId: 'f', plannedPercent: 33, actualPercent: 50 },
+      { categoryId: 'x', plannedPercent: 0, actualPercent: 0 },
+    ]);
+  });
+
+  it('never divides by zero when nothing is planned or spent', () => {
+    expect(budgetBarPercents([])).toEqual([]);
+    expect(budgetBarPercents(buildBudgetRows([{ id: 'a', name: 'A' }], [], []))[0]).toEqual({
+      categoryId: 'a',
+      plannedPercent: 0,
+      actualPercent: 0,
+    });
+  });
+});
+
+describe('income source labels', () => {
+  it('splits "Person · Source"', () => {
+    expect(splitIncomeLabel('Jamie · Retail Job')).toEqual({
+      person: 'Jamie',
+      source: 'Retail Job',
+    });
+    expect(splitIncomeLabel('Riverside Retail')).toEqual({
+      person: '',
+      source: 'Riverside Retail',
+    });
+  });
+
+  it('joins and round-trips', () => {
+    expect(joinIncomeLabel(' Sam ', ' Freelance Design ')).toBe('Sam · Freelance Design');
+    expect(joinIncomeLabel('', 'Penske')).toBe('Penske');
+    expect(joinIncomeLabel('Sam', '')).toBe('Sam');
+    expect(splitIncomeLabel(joinIncomeLabel('carol Lyons', 'Northside Hospital.'))).toEqual({
+      person: 'carol Lyons',
+      source: 'Northside Hospital.',
+    });
   });
 });

@@ -1,38 +1,35 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import { formatCents } from '@own-my-budget/core';
+import { formatCentsCompact } from '@own-my-budget/core';
 
+import { BudgetCard } from '@/components/budget/budget-card';
 import { formatPayday } from '@/components/budget/format';
 import { FREQUENCY_LABEL, type PaySchedule } from '@/components/budget/use-budget-data';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { CurrencyText } from '@/components/ui/currency-text';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusPill } from '@/components/ui/status-pill';
-import { useTheme } from '@/hooks/use-theme';
 import { Space } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export interface PaySchedulesCardProps {
   schedules: PaySchedule[];
-  editable: boolean;
   isLoading: boolean;
 }
 
-/** The "Pay schedules" list: who pays how much, how often, and when next. */
-export function PaySchedulesCard({ schedules, editable, isLoading }: PaySchedulesCardProps) {
+/** The "Pay schedules" list: who pays how much, how often, and when next — plus Add / Edit. */
+export function PaySchedulesCard({ schedules, isLoading }: PaySchedulesCardProps) {
   const theme = useTheme();
 
   return (
-    <SectionCard
+    <BudgetCard
       title="Pay schedules"
       action={
-        editable ? (
-          <Button
-            label="+ Add income source"
-            variant="secondary"
-            onPress={() => router.push('/add-income')}
-          />
-        ) : undefined
+        <Button
+          label="+ Add income source"
+          size="sm"
+          shape="rounded"
+          onPress={() => router.push('/add-income')}
+        />
       }
     >
       {schedules.length === 0 ? (
@@ -85,23 +82,25 @@ export function PaySchedulesCard({ schedules, editable, isLoading }: PaySchedule
                   </ThemedText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[3] }}>
-                  <CurrencyText cents={schedule.amountCents} size="row" />
-                  {editable ? (
-                    <Button
-                      label="Edit"
-                      variant="secondary"
-                      accessibilityLabel={`Edit ${schedule.label}, ${formatCents(schedule.amountCents)}`}
-                      onPress={() =>
-                        router.push({ pathname: '/add-income', params: { id: schedule.id } })
-                      }
-                    />
-                  ) : null}
+                  <ThemedText type="amountSmall">
+                    {formatCentsCompact(schedule.amountCents)}
+                  </ThemedText>
+                  <Button
+                    label="Edit"
+                    variant="soft"
+                    size="sm"
+                    shape="rounded"
+                    accessibilityLabel={`Edit ${schedule.label}, ${formatCentsCompact(schedule.amountCents)}`}
+                    onPress={() =>
+                      router.push({ pathname: '/add-income', params: { id: schedule.id } })
+                    }
+                  />
                 </View>
               </View>
             );
           })}
         </View>
       )}
-    </SectionCard>
+    </BudgetCard>
   );
 }

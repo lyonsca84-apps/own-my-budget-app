@@ -20,13 +20,15 @@ import {
   type Tables,
 } from '@own-my-budget/api';
 import {
-  DEMO_DATA,
   assignPaycheck,
+  budgetBarPercents,
   buildBudgetRows,
   deriveBillStatus,
   formatLocalDate,
   generatePaydays,
+  splitIncomeLabel,
   summarizeBudget,
+  type BudgetBarPercents,
   type BudgetCategoryRow,
   type BudgetLineInput,
   type BudgetSummary,
@@ -34,7 +36,7 @@ import {
   type PayFrequency,
 } from '@own-my-budget/core';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 
 export const MONTH_NAMES = [
@@ -54,8 +56,8 @@ export const MONTH_NAMES = [
 
 export const FREQUENCY_LABEL: Record<string, string> = {
   weekly: 'Weekly',
-  biweekly: 'Every two weeks',
-  twice_monthly: 'Twice a month',
+  biweekly: 'Biweekly',
+  twice_monthly: 'Twice monthly',
   monthly: 'Monthly',
   variable: 'Variable',
 };
@@ -91,7 +93,10 @@ export interface PaydayCardData {
   key: string;
   incomeSourceId: string;
   payDate: string;
+  /** The pay schedule's source half of "Person · Source" (e.g. "Retail Job"). */
   sourceLabel: string;
+  /** The person half; empty when the schedule has no person. */
+  personLabel: string;
   expectedCents: number;
   assignedCents: number;
   /** Negative when the assigned payments exceed the paycheck. */
@@ -119,6 +124,8 @@ export interface BudgetData {
   setPeriod: (month: number, year: number) => void;
   periodLabel: string;
   rows: BudgetCategoryRow[];
+  /** Bar widths per row (same order as `rows`), from core's `budgetBarPercents`. */
+  bars: BudgetBarPercents[];
   summary: BudgetSummary;
   schedules: PaySchedule[];
   paydays: PaydayCardData[];
@@ -195,8 +202,12 @@ function buildPaydayCards(
       (payDate) => ({ source, payDate })
     )
   );
+  // Same-day paydays keep the order the schedules were added in.
+  const sourceOrder = new Map(sources.map((source, index) => [source.id, index]));
   candidates.sort(
-    (a, b) => a.payDate.localeCompare(b.payDate) || a.source.label.localeCompare(b.source.label)
+    (a, b) =>
+      a.payDate.localeCompare(b.payDate) ||
+      (sourceOrder.get(a.source.id) ?? 0) - (sourceOrder.get(b.source.id) ?? 0)
   );
 
   return candidates.slice(0, PAYDAY_COUNT).map(({ source, payDate }) => {
@@ -221,7 +232,8 @@ function buildPaydayCards(
       key: `${source.id}|${payDate}`,
       incomeSourceId: source.id,
       payDate,
-      sourceLabel: source.label,
+      sourceLabel: splitIncomeLabel(source.label).source,
+      personLabel: splitIncomeLabel(source.label).person,
       expectedCents: source.amountCents,
       assignedCents: result.totalAllocatedCents,
       remainingCents: result.remainingCents,
@@ -229,86 +241,6 @@ function buildPaydayCards(
       items,
     };
   });
-}
-
-interface GuestBudget {
-  rows: BudgetCategoryRow[];
-  schedules: PaySchedule[];
-  paydays: PaydayCardData[];
-}
-
-/**
- * Guest mode shows the shared sample household read-only, like the
- * Dashboard. Planned amounts come from the bills in each category, "actual"
- * from the ones already paid; sample payments are placed on the earliest
- * payday with room, so nothing here is a hand-typed constant.
- */
-function buildGuestBudget(today: Date): GuestBudget {
-  const { bills, debts, incomeSources } = DEMO_DATA;
-
-  const categoryNames = Array.from(new Set(bills.map((b) => b.category)));
-  const categories = categoryNames.map((name) => ({ id: name, name }));
-  const lines: BudgetLineInput[] = categoryNames.map((name) => ({
-    categoryId: name,
-    plannedCents: bills.filter((b) => b.category === name).reduce((s, b) => s + b.amountCents, 0),
-    actualOverrideCents: null,
-  }));
-  const tracked: CategorizedAmount[] = bills
-    .filter((b) => b.status === 'paid')
-    .map((b) => ({ categoryId: b.category, amountCents: b.amountCents }));
-  const rows = buildBudgetRows(categories, lines, tracked);
-
-  const sources = incomeSources.map((s) => ({
-    id: s.id,
-    label: s.label,
-    frequency: s.frequency as string,
-    amountCents: s.amountCents,
-    nextPayDate: s.nextPayDate as string | null,
-  }));
-  const schedules = sources.map((s) => scheduleFrom({ ...s, isActive: true }, today));
-
-  const obligations = [
-    ...bills
-      .filter((b) => b.status !== 'paid')
-      .map((b) => ({
-        type: 'bill' as const,
-        id: b.id,
-        name: b.label,
-        typeLabel: TARGET_TYPE_LABEL.bill,
-        cents: b.amountCents,
-      })),
-    ...debts
-      .filter((d) => d.minimumPaymentCents > 0)
-      .map((d) => ({
-        type: 'debt' as const,
-        id: d.id,
-        name: d.label,
-        typeLabel: TARGET_TYPE_LABEL.debt,
-        cents: d.minimumPaymentCents,
-      })),
-  ];
-  const targetNames = new Map(
-    obligations.map((o) => [`${o.type}:${o.id}`, { name: o.name, typeLabel: o.typeLabel }])
-  );
-
-  const skeleton = buildPaydayCards(sources, [], targetNames, today);
-  const remaining = new Map(skeleton.map((p) => [p.key, p.expectedCents]));
-  const assignments: Parameters<typeof buildPaydayCards>[1] = [];
-  for (const o of obligations) {
-    const slot = skeleton.find((p) => (remaining.get(p.key) ?? 0) >= o.cents);
-    if (!slot) continue;
-    remaining.set(slot.key, (remaining.get(slot.key) ?? 0) - o.cents);
-    assignments.push({
-      id: `demo-${o.type}-${o.id}`,
-      incomeSourceId: slot.incomeSourceId,
-      payDate: slot.payDate,
-      targetType: o.type,
-      targetId: o.id,
-      amountCents: o.cents,
-    });
-  }
-
-  return { rows, schedules, paydays: buildPaydayCards(sources, assignments, targetNames, today) };
 }
 
 function isMissingTable(error: unknown): boolean {
@@ -323,8 +255,7 @@ function messageOf(error: unknown): string {
 }
 
 export function useBudgetData(): BudgetData {
-  const { status, user } = useAuth();
-  const isGuest = status === 'guest';
+  const { userId, isReady, isGuest, guestDataVersion } = useDataUser();
   const today = useMemo(() => new Date(), []);
 
   const [month, setMonth] = useState(today.getMonth());
@@ -363,24 +294,24 @@ export function useBudgetData(): BudgetData {
 
   // Everything that isn't month-specific.
   useEffect(() => {
-    if (status !== 'signedIn' || !user) return;
+    if (!isReady || !userId) return;
     let isMounted = true;
-    const userId = user.id;
+    const uid = userId;
 
     async function load() {
       try {
         const [c, i, p, b, d, g] = await Promise.all([
-          listCategories(supabase, userId),
-          listIncomeSources(supabase, userId, { includeArchived: true }),
-          listPaychecks(supabase, userId),
-          listBillsWithPayments(supabase, userId),
-          listDebtsWithPayments(supabase, userId),
-          listSavingsGoals(supabase, userId),
+          listCategories(supabase, uid, { orderBy: 'created_at' }),
+          listIncomeSources(supabase, uid, { includeArchived: true }),
+          listPaychecks(supabase, uid),
+          listBillsWithPayments(supabase, uid),
+          listDebtsWithPayments(supabase, uid),
+          listSavingsGoals(supabase, uid),
         ]);
         let a: Tables<'payday_assignments'>[] = [];
         let planningAvailable = true;
         try {
-          a = await listPaydayAssignments(supabase, userId);
+          a = await listPaydayAssignments(supabase, uid);
         } catch (error) {
           // A missing table just means the payday-planning migration hasn't
           // been applied yet — anything else is a real failure worth showing.
@@ -407,21 +338,21 @@ export function useBudgetData(): BudgetData {
     return () => {
       isMounted = false;
     };
-  }, [status, user, reloadTick]);
+  }, [isReady, userId, reloadTick, guestDataVersion]);
 
   // Month-specific: the budget lines plus what was actually spent.
   useEffect(() => {
-    if (status !== 'signedIn' || !user) return;
+    if (!isReady || !userId) return;
     let isMounted = true;
-    const userId = user.id;
+    const uid = userId;
     const { start, end } = monthBounds(year, month);
 
     async function load() {
       try {
         const [period, billPayments, transactions] = await Promise.all([
-          findBudgetPeriod(supabase, userId, start),
-          listBillPaymentsForReports(supabase, userId, { fromDate: start, toDate: end }),
-          listTransactions(supabase, userId, { fromDate: start, toDate: end }),
+          findBudgetPeriod(supabase, uid, start),
+          listBillPaymentsForReports(supabase, uid, { fromDate: start, toDate: end }),
+          listTransactions(supabase, uid, { fromDate: start, toDate: end }),
         ]);
         const budgetLines = period ? await listBudgetLines(supabase, period.id) : [];
         if (!isMounted) return;
@@ -451,9 +382,7 @@ export function useBudgetData(): BudgetData {
     return () => {
       isMounted = false;
     };
-  }, [status, user, year, month, reloadTick]);
-
-  const guest = useMemo(() => (isGuest ? buildGuestBudget(today) : null), [isGuest, today]);
+  }, [isReady, userId, year, month, reloadTick, guestDataVersion]);
 
   const realRows = useMemo(
     () =>
@@ -484,7 +413,6 @@ export function useBudgetData(): BudgetData {
   );
 
   const targets = useMemo<PaymentTarget[]>(() => {
-    if (isGuest) return [];
     const now = new Date();
     return [
       ...bills.flatMap((b) => {
@@ -523,7 +451,7 @@ export function useBudgetData(): BudgetData {
         suggestedCents: 0,
       })),
     ];
-  }, [isGuest, bills, debts, goals]);
+  }, [bills, debts, goals]);
 
   const realPaydays = useMemo(() => {
     const names = new Map<string, { name: string; typeLabel: string }>();
@@ -559,17 +487,18 @@ export function useBudgetData(): BudgetData {
     );
   }, [incomeSources, assignments, bills, debts, goals, today]);
 
-  const rows = guest ? guest.rows : realRows;
+  const rows = realRows;
   const summary = useMemo(() => summarizeBudget(rows), [rows]);
+  const bars = useMemo(() => budgetBarPercents(rows), [rows]);
 
   const ensurePeriod = useCallback(async (): Promise<string> => {
-    if (!user) throw new Error('Sign in to edit your budget.');
+    if (!userId) throw new Error('Sign in to edit your budget.');
     if (periodId) return periodId;
     const { start, end } = monthBounds(year, month);
-    const period = await getOrCreateBudgetPeriod(supabase, user.id, start, end);
+    const period = await getOrCreateBudgetPeriod(supabase, userId, start, end);
     setPeriodId(period.id);
     return period.id;
-  }, [user, periodId, year, month]);
+  }, [userId, periodId, year, month]);
 
   const patchLine = useCallback((categoryId: string, patch: Partial<BudgetLineInput>) => {
     setLines((current) => {
@@ -583,14 +512,14 @@ export function useBudgetData(): BudgetData {
 
   const savePlanned = useCallback(
     async (categoryId: string, cents: number) => {
-      if (isGuest || !user) return;
+      if (!isReady || !userId) return;
       const previous = lines.find((l) => l.categoryId === categoryId);
       if ((previous?.plannedCents ?? 0) === cents) return;
       patchLine(categoryId, { plannedCents: cents });
       try {
         const id = await ensurePeriod();
         await upsertBudgetLine(supabase, {
-          user_id: user.id,
+          user_id: userId,
           budget_period_id: id,
           category_id: categoryId,
           planned_cents: cents,
@@ -601,12 +530,12 @@ export function useBudgetData(): BudgetData {
         setErrorMessage(`Couldn't save that planned amount. ${messageOf(error)}`);
       }
     },
-    [isGuest, user, lines, patchLine, ensurePeriod]
+    [isReady, userId, lines, patchLine, ensurePeriod]
   );
 
   const saveActual = useCallback(
     async (categoryId: string, cents: number | null) => {
-      if (isGuest || !user) return;
+      if (!isReady || !userId) return;
       const row = realRows.find((r) => r.categoryId === categoryId);
       const previous = lines.find((l) => l.categoryId === categoryId);
       // Typing the tracked amount back in is the same as clearing the override.
@@ -616,7 +545,7 @@ export function useBudgetData(): BudgetData {
       try {
         const id = await ensurePeriod();
         await upsertBudgetLine(supabase, {
-          user_id: user.id,
+          user_id: userId,
           budget_period_id: id,
           category_id: categoryId,
           planned_cents: previous?.plannedCents ?? 0,
@@ -628,7 +557,7 @@ export function useBudgetData(): BudgetData {
         setErrorMessage(`Couldn't save that amount. ${messageOf(error)}`);
       }
     },
-    [isGuest, user, realRows, lines, patchLine, ensurePeriod]
+    [isReady, userId, realRows, lines, patchLine, ensurePeriod]
   );
 
   const assignPayment = useCallback(
@@ -637,10 +566,10 @@ export function useBudgetData(): BudgetData {
       target: PaymentTarget,
       cents: number
     ) => {
-      if (isGuest || !user) return;
+      if (!isReady || !userId) return;
       try {
         const saved = await assignPaymentToPayday(supabase, {
-          user_id: user.id,
+          user_id: userId,
           income_source_id: payday.incomeSourceId,
           pay_date: payday.payDate,
           target_type: target.type,
@@ -654,12 +583,11 @@ export function useBudgetData(): BudgetData {
         throw error;
       }
     },
-    [isGuest, user]
+    [isReady, userId]
   );
 
   const removeAssignment = useCallback(
     async (assignmentId: string) => {
-      if (isGuest) return;
       const previous = assignments;
       setAssignments((current) => current.filter((a) => a.id !== assignmentId));
       try {
@@ -670,42 +598,35 @@ export function useBudgetData(): BudgetData {
         setErrorMessage(`Couldn't remove that payment. ${messageOf(error)}`);
       }
     },
-    [isGuest, assignments]
+    [assignments]
   );
 
-  const setPeriod = useCallback(
-    (nextMonth: number, nextYear: number) => {
-      if (isGuest) return;
-      setMonth(nextMonth);
-      setYear(nextYear);
-      // Different month, different budget period.
-      setPeriodId(null);
-    },
-    [isGuest]
-  );
+  const setPeriod = useCallback((nextMonth: number, nextYear: number) => {
+    setMonth(nextMonth);
+    setYear(nextYear);
+    // Different month, different budget period.
+    setPeriodId(null);
+  }, []);
 
   const clearError = useCallback(() => setErrorMessage(null), []);
 
-  const isLoading = !isGuest && (isBaseLoading || loadedMonthKey !== `${year}-${month}`);
+  const isLoading = !isReady || isBaseLoading || loadedMonthKey !== `${year}-${month}`;
 
   return {
     isGuest,
     isLoading,
     hasNoData:
-      !isGuest &&
-      !isLoading &&
-      categories.length === 0 &&
-      incomeSources.length === 0 &&
-      paychecks.length === 0,
+      !isLoading && categories.length === 0 && incomeSources.length === 0 && paychecks.length === 0,
     month,
     year,
     setPeriod,
     periodLabel: `${MONTH_NAMES[month]} ${year}`,
     rows,
+    bars,
     summary,
-    schedules: guest ? guest.schedules : realSchedules,
-    paydays: guest ? guest.paydays : realPaydays,
-    paychecks: isGuest ? [] : paychecks,
+    schedules: realSchedules,
+    paydays: realPaydays,
+    paychecks,
     targets,
     paydayPlanningAvailable,
     errorMessage,

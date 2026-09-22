@@ -66,3 +66,24 @@ export async function toggleGroceryItem(
     .eq('id', itemId);
   if (error) throw error;
 }
+
+export async function deleteGroceryItem(
+  client: TypedSupabaseClient,
+  itemId: string
+): Promise<void> {
+  const { error } = await client.from('grocery_items').delete().eq('id', itemId);
+  if (error) throw error;
+}
+
+/** Removes every checked-off item from a list — the "I've bought these" cleanup. */
+export async function clearCheckedGroceryItems(
+  client: TypedSupabaseClient,
+  groceryListId: string
+): Promise<void> {
+  const { error } = await client
+    .from('grocery_items')
+    .delete()
+    .eq('grocery_list_id', groceryListId)
+    .eq('is_checked', true);
+  if (error) throw error;
+}

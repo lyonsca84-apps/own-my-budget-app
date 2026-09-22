@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { formatCents } from '@own-my-budget/core';
+import { formatCents, formatCentsCompact } from '@own-my-budget/core';
 
 import { parseDollarsToCents, centsToInputText } from '@/components/budget/amount-input';
 import { formatPayday } from '@/components/budget/format';
@@ -8,7 +8,7 @@ import type { PaydayCardData, PaymentTarget } from '@/components/budget/use-budg
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CurrencyText } from '@/components/ui/currency-text';
+import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,13 +17,12 @@ export interface PaydayCardProps {
   payday: PaydayCardData;
   /** Everything that could be assigned to a payday. */
   targets: PaymentTarget[];
-  editable: boolean;
   onAssign: (target: PaymentTarget, cents: number) => Promise<void>;
   onRemove: (assignmentId: string) => void;
 }
 
 /** One upcoming paycheck: expected amount, what's assigned to it, what's left, and the tools to change that. */
-export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: PaydayCardProps) {
+export function PaydayCard({ payday, targets, onAssign, onRemove }: PaydayCardProps) {
   const theme = useTheme();
   const [isAssigning, setIsAssigning] = useState(false);
   const [selected, setSelected] = useState<PaymentTarget | null>(null);
@@ -80,7 +79,7 @@ export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: Pa
         gap: Space[3],
         borderWidth: 1.5,
         borderColor: theme.border,
-        borderRadius: Radius.smallCard,
+        borderRadius: Radius.card,
         padding: Space[5],
         shadowOpacity: 0,
         elevation: 0,
@@ -96,11 +95,12 @@ export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: Pa
         }}
       >
         <View style={{ flexShrink: 1, gap: 2 }}>
-          <ThemedText type="smallBold">
+          <ThemedText type="smallBold" style={{ fontSize: 17, lineHeight: 24 }}>
             {dateLabel} · {payday.sourceLabel}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Expected {formatCents(payday.expectedCents)}
+            {payday.personLabel ? `${payday.personLabel} · expected` : 'Expected'}{' '}
+            {formatCents(payday.expectedCents)}
           </ThemedText>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
@@ -108,8 +108,7 @@ export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: Pa
             {remainingLabel}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {formatCents(payday.assignedCents)} assigned · {payday.items.length}{' '}
-            {payday.items.length === 1 ? 'payment' : 'payments'}
+            {formatCents(payday.assignedCents)} assigned · {payday.items.length} payment(s)
           </ThemedText>
         </View>
       </View>
@@ -125,7 +124,7 @@ export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: Pa
           }}
         >
           <ThemedText type="smallBold" themeColor="warning">
-            Assigned payments exceed this paycheck — you may want to move one to another payday.
+            ⚠ Assigned payments exceed this paycheck — you may want to move one to another payday.
           </ThemedText>
         </View>
       ) : null}
@@ -157,80 +156,77 @@ export function PaydayCard({ payday, targets, editable, onAssign, onRemove }: Pa
                 </ThemedText>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[2] }}>
-                <CurrencyText cents={item.amountCents} size="row" />
-                {editable ? (
-                  <Button
-                    label="Remove"
-                    variant="quiet"
-                    accessibilityLabel={`Remove ${item.name} from the ${dateLabel} paycheck`}
-                    onPress={() => onRemove(item.assignmentId)}
-                  />
-                ) : null}
+                <ThemedText type="smallBold">{formatCentsCompact(item.amountCents)}</ThemedText>
+                <Button
+                  label="Remove"
+                  variant="dangerQuiet"
+                  size="sm"
+                  accessibilityLabel={`Remove ${item.name} from the ${dateLabel} paycheck`}
+                  onPress={() => onRemove(item.assignmentId)}
+                />
               </View>
             </View>
           ))}
         </View>
       )}
 
-      {editable ? (
-        isAssigning ? (
-          <View style={{ gap: Space[3] }}>
-            <ThemedText type="smallBold">Assign a payment to this paycheck</ThemedText>
-            {available.length === 0 ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Nothing left to assign — add a bill, debt, or savings goal first.
-              </ThemedText>
-            ) : (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-                {available.map((target) => (
-                  <Button
-                    key={`${target.type}:${target.id}`}
-                    label={target.name}
-                    variant={
-                      selected?.type === target.type && selected.id === target.id
-                        ? 'primary'
-                        : 'secondary'
-                    }
-                    accessibilityLabel={`${target.name}, ${target.typeLabel}`}
-                    accessibilityState={{
-                      selected: selected?.type === target.type && selected.id === target.id,
-                    }}
-                    onPress={() => chooseTarget(target)}
-                  />
-                ))}
-              </View>
-            )}
-            {selected ? (
-              <TextField
-                label={`Amount for ${selected.name}`}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                errorMessage={formError ?? undefined}
-              />
-            ) : null}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-              <Button
-                label={isSaving ? 'Saving…' : 'Assign'}
-                variant="panel"
-                disabled={!selected || isSaving}
-                onPress={save}
-              />
-              <Button label="Cancel" variant="secondary" onPress={closeForm} />
-            </View>
-          </View>
-        ) : (
-          <View style={{ alignSelf: 'flex-start' }}>
-            <Button
-              label="+ Assign a payment"
-              variant="secondary"
-              accessibilityLabel={`Assign a payment to the ${dateLabel} paycheck`}
-              onPress={() => setIsAssigning(true)}
+      {isAssigning ? (
+        <View style={{ gap: Space[3] }}>
+          <ThemedText type="smallBold">Assign a payment to this paycheck</ThemedText>
+          {available.length === 0 ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              Nothing left to assign — add a bill, debt, or savings goal first.
+            </ThemedText>
+          ) : (
+            <SelectField
+              label="Payment"
+              placeholder="Choose a bill, debt, or goal"
+              value={selected ? `${selected.type}:${selected.id}` : ''}
+              options={available.map((target) => ({
+                value: `${target.type}:${target.id}`,
+                label: `${target.name} — ${target.typeLabel}`,
+              }))}
+              onChange={(value) => {
+                const target = available.find((t) => `${t.type}:${t.id}` === value);
+                if (target) chooseTarget(target);
+              }}
             />
+          )}
+          {selected ? (
+            <TextField
+              label={`Amount for ${selected.name}`}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+              errorMessage={formError ?? undefined}
+            />
+          ) : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+            <Button
+              label="Assign"
+              accessibilityLabel={`Assign the selected payment to the ${dateLabel} ${payday.sourceLabel} paycheck`}
+              size="sm"
+              shape="rounded"
+              loading={isSaving}
+              disabled={!selected || isSaving}
+              onPress={save}
+            />
+            <Button label="Cancel" variant="soft" size="sm" shape="rounded" onPress={closeForm} />
           </View>
-        )
-      ) : null}
+        </View>
+      ) : (
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Button
+            label="+ Assign payment"
+            variant="soft"
+            size="sm"
+            shape="rounded"
+            accessibilityLabel={`Assign a payment to the ${dateLabel} ${payday.sourceLabel} paycheck`}
+            onPress={() => setIsAssigning(true)}
+          />
+        </View>
+      )}
     </Card>
   );
 }

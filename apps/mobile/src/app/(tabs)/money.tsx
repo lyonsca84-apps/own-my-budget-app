@@ -1,208 +1,182 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { View } from 'react-native';
-import { archiveSavingsGoal } from '@own-my-budget/api';
-import { formatCents, type GoalStatus } from '@own-my-budget/core';
+import { useCallback, useState, type ReactNode } from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
+import { type GoalStatus } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { ActivitySection } from '@/components/savings/activity-section';
 import { BadgeTile } from '@/components/savings/badge-tile';
-import { ChallengeDetails } from '@/components/savings/challenge-details';
-import { confirmAction } from '@/components/savings/confirm';
-import { CountTile } from '@/components/savings/count-tile';
-import { EmergencyFundSection } from '@/components/savings/emergency-fund-section';
+import { formatMoney } from '@/components/savings/format';
 import { GoalDetails } from '@/components/savings/goal-details';
 import { MissionRow } from '@/components/savings/mission-row';
+import { StatCard } from '@/components/savings/stat-card';
 import {
   useSavingsData,
   type ChallengeView,
+  type GoalActivityView,
   type GoalView,
 } from '@/components/savings/use-savings-data';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { GoalCard } from '@/components/ui/goal-card';
-import { Grid } from '@/components/ui/grid';
+import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
-import { ScreenHeader } from '@/components/ui/screen-header';
 import { SectionCard } from '@/components/ui/section-card';
-import { StatTile } from '@/components/ui/stat-tile';
 import type { StatusTone } from '@/components/ui/status-pill';
-import { SubsectionHeader } from '@/components/ui/subsection-header';
-import { Space } from '@/constants/theme';
+import { Brand, Fonts, Radius, Space } from '@/constants/theme';
 import { BrandAssets } from '@/design-system/assets/brand';
-import { GoalAssets } from '@/design-system/assets/goals';
-import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/hooks/use-theme';
 
 const STATUS_LABEL: Record<GoalStatus, { label: string; tone: StatusTone }> = {
   completed: { label: 'Completed', tone: 'success' },
-  onTrack: { label: 'On track', tone: 'success' },
-  // Calm amber, never red — being behind pace is a nudge, not a failure.
-  behind: { label: 'A little behind', tone: 'warning' },
-  inProgress: { label: 'In progress', tone: 'neutral' },
-  notStarted: { label: 'Not started', tone: 'neutral' },
+  onTrack: { label: 'On Track', tone: 'accent' },
+  // Clay, not red: behind pace is a nudge, not a failure. The words carry the meaning too.
+  behind: { label: 'Behind Schedule', tone: 'danger' },
+  inProgress: { label: 'In Progress', tone: 'info' },
+  notStarted: { label: 'Not Started', tone: 'neutral' },
+  paused: { label: 'Paused', tone: 'neutral' },
 };
 
-function illustrationFor(goal: GoalView) {
-  if (goal.category === 'Emergency Fund') return GoalAssets.emergencyFund;
-  if (goal.category === 'Vacation') return GoalAssets.familyVacation;
-  if (goal.category === 'Major Purchase') return GoalAssets.newLaptop;
-  return undefined;
+const GRID_GAP = Space[5];
+const MIN_CARD_WIDTH = 290;
+
+/** Lays cards out in equal columns (up to three, as in the design) so a lone last card keeps its column width. */
+function CardGrid({ children }: { children: ReactNode[] }) {
+  const [width, setWidth] = useState(0);
+  const columns = width
+    ? Math.max(1, Math.min(3, Math.floor((width + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))))
+    : 1;
+  const cardWidth = width ? (width - GRID_GAP * (columns - 1)) / columns : undefined;
+
+  return (
+    <View
+      onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, alignItems: 'flex-start' }}
+    >
+      {children.map((child, index) => (
+        <View key={index} style={{ width: cardWidth ?? '100%', minWidth: 0 }}>
+          {child}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export default function MoneyScreen() {
+  const theme = useTheme();
   const data = useSavingsData();
-  const { refresh, isGuest } = data;
+  const { refresh } = data;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openBadgeId, setOpenBadgeId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      refresh();
+      void refresh();
     }, [refresh])
   );
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id));
 
-  /** Guests explore sample data only; any change nudges them toward an account. */
-  const signUp = () => router.push('/sign-up');
-
-  const openActivity = (
-    goalId: string,
-    kind: 'deposit' | 'withdrawal',
-    prefill?: { amountCents: number; note: string }
-  ) => {
-    if (isGuest) return signUp();
-    router.push({
-      pathname: '/add-goal-activity',
-      params: {
-        goalId,
-        kind,
-        ...(prefill ? { amountCents: String(prefill.amountCents), note: prefill.note } : {}),
-      },
-    });
+  const run = async (id: string, action: () => Promise<void>, fallback: string) => {
+    try {
+      await action();
+      setActionError(null);
+    } catch (error) {
+      setActionError({ id, message: error instanceof Error ? error.message : fallback });
+    }
   };
 
-  const openAddGoal = (preset?: 'emergency' | 'challenge') => {
-    if (isGuest) return signUp();
+  const openDeposit = (goalId: string) =>
+    router.push({ pathname: '/add-goal-activity', params: { goalId } });
+  const openEditDeposit = (deposit: GoalActivityView) =>
+    router.push({
+      pathname: '/add-goal-activity',
+      params: { goalId: deposit.goalId, activityId: deposit.id },
+    });
+  const openNewGoal = (preset?: 'challenge') =>
     router.push(
       preset
         ? { pathname: '/add-savings-goal', params: { preset } }
         : { pathname: '/add-savings-goal' }
     );
-  };
-
-  const openEdit = (goalId: string) =>
+  const openEditGoal = (goalId: string) =>
     router.push({ pathname: '/add-savings-goal', params: { goalId } });
+  const planPayment = (goal: GoalView) =>
+    router.push({
+      pathname: '/plan-payment',
+      params: {
+        targetType: 'savings_goal',
+        targetId: goal.id,
+        // Older builds of the dialog read kind / id.
+        kind: 'savings_goal',
+        id: goal.id,
+        ...((goal.suggestedCents ?? goal.plannedDepositCents)
+          ? { amount: String(goal.suggestedCents ?? goal.plannedDepositCents) }
+          : {}),
+      },
+    });
 
-  const deleteGoal = (goal: { id: string; title: string }) =>
-    confirmAction(
-      'Delete this goal?',
-      `"${goal.title}" will be removed from your goals. Its deposit history is kept.`,
-      'Delete',
-      async () => {
-        try {
-          await archiveSavingsGoal(supabase, goal.id, new Date().toISOString());
-          setActionError(null);
-          await refresh();
-        } catch (error) {
-          setActionError(error instanceof Error ? error.message : 'Could not delete that goal.');
-        }
-      }
-    );
-
-  const renderGoal = (goal: GoalView) => (
-    <GoalCard
-      title={goal.title}
-      category={goal.category}
-      savedCents={goal.savedCents}
-      targetCents={goal.targetCents}
-      percent={goal.percent}
-      isComplete={goal.isComplete}
-      remainingCents={goal.remainingCents}
-      targetDate={goal.targetDate}
-      status={STATUS_LABEL[goal.status]}
-      illustration={illustrationFor(goal)}
-      expanded={expandedId === goal.id}
-      onToggleExpanded={() => toggle(goal.id)}
-      details={
-        <GoalDetails
-          goal={goal}
-          readOnly={isGuest}
-          onEdit={() => openEdit(goal.id)}
-          onDelete={() => deleteGoal(goal)}
-        />
-      }
-      actions={
-        <>
-          <Button
-            label={expandedId === goal.id ? 'Hide details' : 'View details'}
-            variant="secondary"
-            onPress={() => toggle(goal.id)}
-            accessibilityLabel={`${expandedId === goal.id ? 'Hide' : 'View'} details for ${goal.title}`}
-          />
-          <Button
-            label="Add deposit"
-            onPress={() => openActivity(goal.id, 'deposit')}
-            accessibilityLabel={`Add deposit to ${goal.title}`}
-          />
-          <Button
-            label="Withdraw"
-            variant="quiet"
-            onPress={() => openActivity(goal.id, 'withdrawal')}
-            accessibilityLabel={`Withdraw from ${goal.title}`}
-          />
-        </>
-      }
-    />
-  );
-
-  const renderChallenge = (challenge: ChallengeView) => {
-    const cardKey = `challenge-${challenge.goalId}`;
-    const finished = challenge.next === null;
+  const renderGoal = (goal: GoalView) => {
+    const expanded = expandedId === goal.id;
     return (
       <GoalCard
-        title={challenge.title}
-        category={`Block ${Math.min(challenge.blocksDone + 1, challenge.blocks.length)} of ${challenge.blocks.length} · ${challenge.weeksDone} of ${challenge.totalWeeks} weeks`}
-        savedCents={challenge.savedCents}
-        targetCents={challenge.targetCents}
-        percent={challenge.percent}
-        isComplete={finished}
-        expanded={expandedId === cardKey}
-        onToggleExpanded={() => toggle(cardKey)}
+        title={goal.title}
+        category={goal.category}
+        savedCents={goal.savedCents}
+        targetCents={goal.targetCents}
+        percent={goal.percent}
+        isComplete={goal.isComplete}
+        remainingCents={goal.remainingCents}
+        status={STATUS_LABEL[goal.status]}
+        ringColor={goal.color}
+        expanded={expanded}
+        onToggleExpanded={() => toggle(goal.id)}
         details={
-          <ChallengeDetails
-            challenge={challenge}
-            readOnly={isGuest}
-            onEdit={() => openEdit(challenge.goalId)}
+          <GoalDetails
+            goal={goal}
+            designSchema={data.capabilities.goalDesign}
+            errorMessage={actionError?.id === goal.id ? actionError.message : null}
+            onPlanPayment={() => planPayment(goal)}
+            onEdit={() => openEditGoal(goal.id)}
+            onTogglePause={() =>
+              run(
+                goal.id,
+                () => data.setGoalPaused(goal.id, !goal.isPaused),
+                'Could not update that goal.'
+              )
+            }
+            onDelete={() =>
+              run(goal.id, () => data.deleteGoal(goal.id), 'Could not delete that goal.')
+            }
+            onEditDeposit={openEditDeposit}
+            onDeleteDeposit={(deposit) =>
+              run(goal.id, () => data.deleteDeposit(deposit.id), 'Could not delete that entry.')
+            }
           />
         }
         actions={
           <>
-            {challenge.next ? (
-              <Button
-                label={`Log week ${challenge.next.week} (${formatCents(challenge.next.dueCents)})`}
-                onPress={() =>
-                  openActivity(challenge.goalId, 'deposit', {
-                    amountCents: challenge.next!.dueCents,
-                    note: `Week ${challenge.next!.week}`,
-                  })
-                }
-              />
-            ) : null}
             <Button
-              label={expandedId === cardKey ? 'Hide details' : 'View details'}
-              variant="secondary"
-              onPress={() => toggle(cardKey)}
-              accessibilityLabel={`${expandedId === cardKey ? 'Hide' : 'View'} details for ${challenge.title}`}
+              label={expanded ? 'Hide Details' : 'View Details'}
+              variant="outline"
+              shape="rounded"
+              size="sm"
+              style={{ flexGrow: 1, flexBasis: 110 }}
+              onPress={() => toggle(goal.id)}
+              aria-expanded={expanded}
+              accessibilityLabel={`${expanded ? 'Hide' : 'View'} details for ${goal.title}`}
             />
             <Button
-              label="Withdraw"
-              variant="quiet"
-              onPress={() => openActivity(challenge.goalId, 'withdrawal')}
-              accessibilityLabel={`Withdraw from ${challenge.title}`}
+              label="Add Deposit"
+              shape="rounded"
+              size="sm"
+              style={{ flexGrow: 1, flexBasis: 110 }}
+              onPress={() => openDeposit(goal.id)}
+              accessibilityLabel={`Add deposit to ${goal.title}`}
             />
           </>
         }
@@ -210,31 +184,95 @@ export default function MoneyScreen() {
     );
   };
 
-  const { summary, monthly } = data;
-  const activeCards = data.challenges.length + data.regularGoals.length;
-  const hasNoGoals = data.goals.length === 0 && data.challenges.length === 0;
+  const renderChallenge = (challenge: ChallengeView) => {
+    const cardKey = `challenge-${challenge.goalId}`;
+    const expanded = expandedId === cardKey;
+    return (
+      <GoalCard
+        title={challenge.title}
+        category={`Block ${challenge.blocksDone} of ${challenge.blocks.length}`}
+        savedLabel="Saved so far"
+        savedCents={challenge.savedCents}
+        targetCents={challenge.targetCents}
+        percent={challenge.percent}
+        isComplete={challenge.weeksDone >= challenge.totalWeeks}
+        status={undefined}
+        ringColor={challenge.color}
+        expanded={expanded}
+        onToggleExpanded={() => toggle(cardKey)}
+        details={
+          <View style={{ gap: Space[3] }}>
+            <View style={{ height: 1, backgroundColor: theme.border }} />
+            <View style={{ gap: Space[1] }}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Week {challenge.currentWeek} of {challenge.totalWeeks} ·{' '}
+                {challenge.cadence === 'biweekly' ? 'Biweekly' : 'Weekly'} deposits
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Start {shortDate(challenge.startDate)} · Ends {shortDate(challenge.endDate)}
+              </ThemedText>
+              <ThemedText type="smallBold" style={{ color: theme.solidAccent }}>
+                {challenge.blocksDone} of {challenge.blocks.length} blocks completed
+              </ThemedText>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+              <Button
+                label="Edit Challenge"
+                variant="soft"
+                size="sm"
+                shape="rounded"
+                onPress={() => openEditGoal(challenge.goalId)}
+              />
+            </View>
+          </View>
+        }
+        actions={
+          <Button
+            label="View Details"
+            shape="rounded"
+            size="sm"
+            style={{ flexGrow: 1 }}
+            onPress={() =>
+              router.push({ pathname: '/savings-challenge', params: { goalId: challenge.goalId } })
+            }
+            accessibilityLabel={`View details for ${challenge.title}`}
+          />
+        }
+      />
+    );
+  };
 
-  const monthlyValue =
-    monthly.thisMonthCents > 0
-      ? `+${formatCents(monthly.thisMonthCents)}`
-      : formatCents(monthly.thisMonthCents);
+  const { summary, monthly } = data;
+  const goalCards = [
+    ...data.challenges.map((challenge) => renderChallenge(challenge)),
+    ...data.goals.map((goal) => renderGoal(goal)),
+  ];
+  const hasNoGoals = data.goals.length === 0 && data.challenges.length === 0;
+  const anyBehind = data.goals.some((g) => g.status === 'behind');
+
+  const monthlyValue = formatMoney(Math.max(monthly.thisMonthCents, 0));
   const monthlyNote =
     monthly.thisMonthCents <= 0
-      ? monthly.hasLastMonth
-        ? 'No deposits yet this month'
-        : 'No previous month to compare'
+      ? 'No deposits yet this month'
       : monthly.percentChange !== null
         ? `${monthly.percentChange >= 0 ? '+' : ''}${monthly.percentChange}% vs last month`
-        : monthly.hasLastMonth
-          ? 'First deposits this month'
-          : 'No previous month to compare';
+        : 'Deposits so far this month';
 
   return (
     <Screen showGuestBanner>
-      <ScreenHeader
+      <PageHeader
         title="Savings & Goals"
         subtitle="Track your savings, build better habits, and reach your goals."
-        action={<Button label="+ New goal" onPress={() => openAddGoal()} />}
+        backLink={{ label: 'Back to Dashboard', href: '/' }}
+        right={
+          <Button
+            label="+ New Goal"
+            size="sm"
+            shape="rounded"
+            onPress={() => openNewGoal()}
+            accessibilityLabel="New savings goal"
+          />
+        }
       />
 
       {data.errorMessage ? (
@@ -243,15 +281,7 @@ export default function MoneyScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             {data.errorMessage}
           </ThemedText>
-          <Button label="Try again" variant="secondary" onPress={refresh} />
-        </Card>
-      ) : null}
-
-      {actionError ? (
-        <Card>
-          <ThemedText type="small" themeColor="danger">
-            {actionError}
-          </ThemedText>
+          <Button label="Try again" variant="outline" size="sm" onPress={() => void refresh()} />
         </Card>
       ) : null}
 
@@ -279,102 +309,130 @@ export default function MoneyScreen() {
         </Card>
       ) : null}
 
-      <Grid>
-        <StatTile
-          label="Total Saved"
-          valueCents={summary.totalSavedCents}
-          glyph="$"
-          glyphColor="success"
-          glyphTint="successMuted"
-          description={
-            summary.totalSavedCents > 0
-              ? `Across ${data.goals.length + data.challenges.length} ${
-                  data.goals.length + data.challenges.length === 1 ? 'goal' : 'goals'
-                }.`
-              : 'Your first deposit will show up here.'
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[5] }}>
+        <TotalSavedCard
+          totalCents={summary.totalSavedCents}
+          note={
+            summary.totalSavedCents === 0
+              ? 'Your first deposit will show up here.'
+              : anyBehind
+                ? 'Every deposit gets you closer.'
+                : "You're building momentum. Keep it up."
           }
-          emphasize
         />
-        <CountTile
-          label="Monthly Savings"
+        <StatCard
+          label="Monthly savings"
           value={monthlyValue}
           description={monthlyNote}
-          glyph="↗"
-          valueColor={monthly.thisMonthCents > 0 ? 'success' : undefined}
+          valueColor={monthly.thisMonthCents > 0 ? 'text' : 'disabled'}
         />
-        <CountTile
-          label="Badges Earned"
+        <StatCard
+          label="Badges earned"
           value={`${data.badgesEarnedCount} ${data.badgesEarnedCount === 1 ? 'Badge' : 'Badges'}`}
           description={
             data.badgesEarnedCount > 0
               ? 'Great progress — keep going!'
               : 'Keep saving to unlock more.'
           }
-          glyph="★"
-          glyphColor="accent"
-          glyphTint="accentMuted"
         />
-      </Grid>
+      </View>
 
-      <SectionCard title="Savings Summary">
-        <Grid gap={Space[4]}>
-          <SummaryItem label="Total savings" value={formatCents(summary.totalSavedCents)} />
-          <SummaryItem label="52-week total" value={formatCents(summary.challengeSavedCents)} />
-          <SummaryItem label="Emergency goals" value={formatCents(summary.emergencySavedCents)} />
+      <Card style={{ gap: Space[4], borderRadius: Radius.hero }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[3] }}>
+          <View
+            accessibilityElementsHidden
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: Radius.input,
+              backgroundColor: theme.backgroundSelected,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                borderWidth: 2,
+                borderColor: theme.solidAccent,
+              }}
+            />
+          </View>
+          <ThemedText
+            accessibilityRole="header"
+            style={{ fontFamily: Fonts.heading.semibold, fontSize: 18 }}
+          >
+            Savings Summary
+          </ThemedText>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[4] }}>
+          <SummaryItem label="Total savings" value={formatMoney(summary.totalSavedCents)} />
+          <SummaryItem
+            label="52-week total"
+            value={formatMoney(summary.challengeSavedCents)}
+            color={theme.solidAccent}
+          />
+          <SummaryItem label="Emergency goals" value={formatMoney(summary.emergencySavedCents)} />
           <SummaryItem label="Active goals" value={String(summary.activeGoalCount)} />
-          <SummaryItem label="Completed" value={String(summary.completedGoalCount)} />
-          <SummaryItem label="Badges" value={String(data.badgesEarnedCount)} />
-        </Grid>
-      </SectionCard>
+          <SummaryItem
+            label="Completed"
+            value={String(summary.completedGoalCount)}
+            color={theme.success}
+          />
+          <SummaryItem
+            label="Badges"
+            value={String(data.badgesEarnedCount)}
+            color={theme.primary}
+          />
+        </View>
+      </Card>
 
-      <EmergencyFundSection
-        goals={data.emergencyGoals}
-        renderGoal={renderGoal}
-        onStart={() => openAddGoal('emergency')}
-      />
-
-      <View style={{ gap: Space[3] }}>
-        <SubsectionHeader title="Active savings goals" />
+      <View style={{ gap: Space[4] }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: Space[3],
+          }}
+        >
+          <ThemedText
+            accessibilityRole="header"
+            style={{ fontFamily: Fonts.heading.semibold, fontSize: 18 }}
+          >
+            Active Savings Goals
+          </ThemedText>
+          {data.challenges.length === 0 && !hasNoGoals ? (
+            <Button
+              label="Start a 52-week challenge"
+              variant="quiet"
+              size="sm"
+              onPress={() => openNewGoal('challenge')}
+            />
+          ) : null}
+        </View>
         {hasNoGoals && !data.isLoading ? (
           <EmptyState
             title="No savings goals yet"
             message="Set a goal for something you care about, or try the 52-week challenge — small, steady deposits add up."
             action={
               <View style={{ gap: Space[2] }}>
-                <Button label="+ New goal" variant="panel" onPress={() => openAddGoal()} />
+                <Button label="+ New Goal" variant="panel" onPress={() => openNewGoal()} />
                 <Button
                   label="Start a 52-week challenge"
-                  variant="secondary"
-                  onPress={() => openAddGoal('challenge')}
+                  variant="outline"
+                  onPress={() => openNewGoal('challenge')}
                 />
               </View>
             }
           />
-        ) : activeCards > 0 ? (
-          <Grid>
-            {data.challenges.map((challenge) => (
-              <View
-                key={`challenge-${challenge.goalId}`}
-                style={{ flexGrow: 1, flexBasis: 320, minWidth: 0, alignSelf: 'flex-start' }}
-              >
-                {renderChallenge(challenge)}
-              </View>
-            ))}
-            {data.regularGoals.map((goal) => (
-              <View
-                key={goal.id}
-                style={{ flexGrow: 1, flexBasis: 320, minWidth: 0, alignSelf: 'flex-start' }}
-              >
-                {renderGoal(goal)}
-              </View>
-            ))}
-          </Grid>
-        ) : data.isLoading ? (
-          <ThemedText themeColor="textSecondary">Loading your goals…</ThemedText>
+        ) : goalCards.length > 0 ? (
+          <CardGrid>{goalCards}</CardGrid>
         ) : (
-          <ThemedText themeColor="textSecondary">
-            Your emergency fund is shown above. Add another goal whenever you&rsquo;re ready.
-          </ThemedText>
+          <ThemedText themeColor="textSecondary">Loading your goals…</ThemedText>
         )}
       </View>
 
@@ -406,7 +464,6 @@ export default function MoneyScreen() {
             <MissionRow
               key={mission.id}
               mission={mission}
-              disabled={isGuest}
               onComplete={() => data.markMissionComplete(mission.id)}
             />
           ))}
@@ -416,13 +473,82 @@ export default function MoneyScreen() {
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function shortDate(iso: string) {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** The hero stat: Total Saved on a Panel-to-teal gradient with a $ tile, white text throughout. */
+function TotalSavedCard({ totalCents, note }: { totalCents: number; note: string }) {
   return (
-    <View style={{ flexGrow: 1, flexBasis: 140, gap: Space[1] }}>
-      <ThemedText type="eyebrow" themeColor="textSecondary">
+    <View style={{ flexGrow: 1, flexBasis: 240, borderRadius: Radius.hero, overflow: 'hidden' }}>
+      <LinearGradient
+        colors={[Brand.panel, '#00758F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ padding: Space[7], gap: Space[3], minHeight: 168, justifyContent: 'center' }}
+      >
+        <View
+          accessibilityElementsHidden
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: Radius.input,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ThemedText style={{ color: '#FFFFFF', fontFamily: Fonts.body.bold, fontSize: 18 }}>
+            $
+          </ThemedText>
+        </View>
+        <ThemedText type="eyebrow" style={{ color: '#FFFFFF', fontSize: 12 }}>
+          Total saved
+        </ThemedText>
+        <ThemedText
+          style={{
+            color: '#FFFFFF',
+            fontFamily: Fonts.heading.bold,
+            fontSize: 32,
+            lineHeight: 40,
+            letterSpacing: -0.32,
+          }}
+        >
+          {formatMoney(totalCents)}
+        </ThemedText>
+        <ThemedText type="small" style={{ color: '#FFFFFF' }}>
+          {note}
+        </ThemedText>
+      </LinearGradient>
+    </View>
+  );
+}
+
+function SummaryItem({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={{ flexGrow: 1, flexBasis: 110, gap: Space[1] }}>
+      <ThemedText
+        type="eyebrow"
+        themeColor="textSecondary"
+        style={{ fontSize: 11, letterSpacing: 0.8 }}
+      >
         {label}
       </ThemedText>
-      <ThemedText type="amountSmall">{value}</ThemedText>
+      <ThemedText
+        style={{
+          fontFamily: Fonts.heading.semibold,
+          fontSize: 24,
+          lineHeight: 30,
+          ...(color ? { color } : {}),
+        }}
+      >
+        {value}
+      </ThemedText>
     </View>
   );
 }

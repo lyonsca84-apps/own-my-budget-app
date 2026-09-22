@@ -66,6 +66,86 @@ export async function recordGoalActivity(
   return data;
 }
 
+/**
+ * Edits one deposit/withdrawal and moves the goal's saved_cents by the
+ * difference, atomically, via the `update_goal_activity` Postgres function.
+ */
+export async function updateGoalActivity(
+  client: TypedSupabaseClient,
+  args: { activityId: string; amountCents: number; occurredOn: string; note?: string }
+): Promise<Tables<'goal_activity'>> {
+  const { data, error } = await client.rpc('update_goal_activity', {
+    p_activity_id: args.activityId,
+    p_amount_cents: args.amountCents,
+    p_note: args.note ?? '',
+    p_occurred_on: args.occurredOn,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Deletes one deposit/withdrawal and reverses its effect on the goal's
+ * saved_cents, atomically, via the `delete_goal_activity` Postgres function.
+ */
+export async function deleteGoalActivity(
+  client: TypedSupabaseClient,
+  activityId: string
+): Promise<Tables<'goal_activity'>> {
+  const { data, error } = await client.rpc('delete_goal_activity', {
+    p_activity_id: activityId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Logs one week of a 52-week challenge as a deposit tagged with its week
+ * (`record_challenge_week`). Rejects a week that is already recorded.
+ */
+export async function recordChallengeWeek(
+  client: TypedSupabaseClient,
+  args: { goalId: string; week: number; amountCents: number; occurredOn: string }
+): Promise<Tables<'goal_activity'>> {
+  const { data, error } = await client.rpc('record_challenge_week', {
+    p_goal_id: args.goalId,
+    p_week: args.week,
+    p_amount_cents: args.amountCents,
+    p_occurred_on: args.occurredOn,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSavingsChallenge(
+  client: TypedSupabaseClient,
+  challengeId: string,
+  patch: TablesUpdate<'savings_challenges'>
+): Promise<Tables<'savings_challenges'>> {
+  const { data, error } = await client
+    .from('savings_challenges')
+    .update(patch)
+    .eq('id', challengeId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * True for the error a database that has not had the savings design migration
+ * (20260920120000) applied yet returns when a new column or function is used —
+ * lets callers fall back to the original fields instead of failing.
+ */
+export function isMissingSavingsSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: string; message?: string };
+  if (code === 'PGRST204' || code === 'PGRST202' || code === '42703' || code === '42883') {
+    return true;
+  }
+  return /schema cache|does not exist|could not find/i.test(message ?? '');
+}
+
 export async function createSavingsChallenge(
   client: TypedSupabaseClient,
   challenge: TablesInsert<'savings_challenges'>
@@ -143,12 +223,16 @@ export async function listUserGoalActivity(
 
 export interface SavingsInsightSignals {
   hasBudgetPlan: boolean;
+  /** YYYY-MM-DD of the first planned budget line — when "Budget Builder" was earned. */
+  budgetPlanSince: string | null;
   /** Active bills that recur within a month (or fall due in it). */
   billsTotal: number;
   /** ...of which already have a payment recorded this month. */
   billsPaid: number;
   hasPaidOffDebt: boolean;
   hasAssignedPaycheck: boolean;
+  /** YYYY-MM-DD of the first assigned paycheck — when "Paycheck Planner" was earned. */
+  assignedPaycheckSince: string | null;
   /** Distinct days with a (non-deleted) transaction since `trackingSince`. */
   trackedDays: number;
 }
@@ -166,9 +250,11 @@ export async function getSavingsInsightSignals(
   const [budget, bills, payments, paidOffDebts, assigned, transactions] = await Promise.all([
     client
       .from('budget_lines')
-      .select('id', { count: 'exact', head: true })
+      .select('created_at')
       .eq('user_id', userId)
-      .gt('planned_cents', 0),
+      .gt('planned_cents', 0)
+      .order('created_at')
+      .limit(1),
     client
       .from('bills')
       .select('id, due_date, recurrence')
@@ -183,9 +269,11 @@ export async function getSavingsInsightSignals(
     client.from('debts').select('id').eq('user_id', userId).lte('balance_cents', 0),
     client
       .from('paychecks')
-      .select('id', { count: 'exact', head: true })
+      .select('created_at')
       .eq('user_id', userId)
-      .eq('is_assigned', true),
+      .eq('is_assigned', true)
+      .order('created_at')
+      .limit(1),
     client
       .from('transactions')
       .select('occurred_on')
@@ -219,11 +307,13 @@ export async function getSavingsInsightSignals(
   }
 
   return {
-    hasBudgetPlan: (budget.count ?? 0) > 0,
+    hasBudgetPlan: (budget.data ?? []).length > 0,
+    budgetPlanSince: budget.data?.[0]?.created_at?.slice(0, 10) ?? null,
     billsTotal: relevantBills.length,
     billsPaid: relevantBills.filter((bill) => paidBillIds.has(bill.id)).length,
     hasPaidOffDebt,
-    hasAssignedPaycheck: (assigned.count ?? 0) > 0,
+    hasAssignedPaycheck: (assigned.data ?? []).length > 0,
+    assignedPaycheckSince: assigned.data?.[0]?.created_at?.slice(0, 10) ?? null,
     trackedDays: new Set((transactions.data ?? []).map((t) => t.occurred_on)).size,
   };
 }

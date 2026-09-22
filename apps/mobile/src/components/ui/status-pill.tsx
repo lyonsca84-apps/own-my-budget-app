@@ -1,32 +1,88 @@
 import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
+import { Fonts, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-export type StatusTone = 'success' | 'warning' | 'danger' | 'neutral';
+/**
+ * Semantic meaning of a status. In the design's status vocabulary:
+ *
+ * | tone      | filled color  | used for                                   |
+ * | --------- | ------------- | ------------------------------------------ |
+ * | `success` | green         | Paid, Completed, Reached                   |
+ * | `warning` | mustard/olive | Due, Upcoming, Needs Attention             |
+ * | `info`    | blue          | Partial, Partially Paid                    |
+ * | `danger`  | clay (rust)   | Overdue, Past Due, Behind Schedule         |
+ * | `accent`  | teal          | On Track                                   |
+ * | `neutral` | gray          | informational (Not Started, Paused…)       |
+ */
+export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'accent' | 'neutral';
 
 export interface StatusPillProps {
   label: string;
   /**
-   * 'success' = on track (sage), 'warning' = watch this (amber, never red),
-   * 'danger' = genuinely overdue (muted clay), 'neutral' = informational.
-   * Matches PLAN.md's "never shame" rule — overspending is amber, not red.
+   * `danger` is the clay/rust color, never bright red — overspending is a calm
+   * watch state, only genuinely overdue or behind-schedule items use clay.
    */
   tone: StatusTone;
+  /**
+   * Solid-fill look used by the approved design (Paid / Due / Partial /
+   * Overdue): a saturated background with white text. Default is the softer
+   * tinted-background look.
+   */
+  filled?: boolean;
 }
 
-const TONE_COLORS: Record<StatusTone, { fg: ThemeColor; bg: ThemeColor }> = {
+const SOFT: Record<StatusTone, { fg: ThemeColor; bg: ThemeColor }> = {
   success: { fg: 'success', bg: 'successMuted' },
   warning: { fg: 'warning', bg: 'warningMuted' },
-  danger: { fg: 'danger', bg: 'dangerMuted' },
+  danger: { fg: 'clay', bg: 'clayMuted' },
+  info: { fg: 'primary', bg: 'primaryMuted' },
+  accent: { fg: 'solidAccent', bg: 'accentMuted' },
   neutral: { fg: 'textSecondary', bg: 'backgroundSelected' },
 };
 
-export function StatusPill({ label, tone }: StatusPillProps) {
-  const theme = useTheme();
-  const colors = TONE_COLORS[tone];
+const SOLID: Record<StatusTone, ThemeColor> = {
+  success: 'solidSuccess',
+  warning: 'solidWarning',
+  danger: 'solidDanger',
+  info: 'solidInfo',
+  accent: 'solidAccent',
+  neutral: 'textSecondary',
+};
 
+export function StatusPill({ label, tone, filled = false }: StatusPillProps) {
+  const theme = useTheme();
+
+  if (filled) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={`Status: ${label}`}
+        style={{
+          alignSelf: 'flex-start',
+          backgroundColor: theme[SOLID[tone]],
+          borderRadius: Radius.chip,
+          paddingVertical: 4,
+          paddingHorizontal: 12,
+        }}
+      >
+        <ThemedText
+          type="smallBold"
+          style={{
+            color: tone === 'neutral' ? theme.background : theme.onSolid,
+            fontFamily: Fonts.body.bold,
+            fontSize: 14,
+            lineHeight: 20,
+          }}
+        >
+          {label}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  const colors = SOFT[tone];
   return (
     <View
       style={{

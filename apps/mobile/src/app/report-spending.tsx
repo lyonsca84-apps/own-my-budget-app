@@ -1,19 +1,29 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { Stack } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
-import { listBillPaymentsForReports, listCategories } from '@own-my-budget/api';
-import { calculateCategoryTotals, formatLocalDate, type CategoryTotal } from '@own-my-budget/core';
+import {
+  filterEntriesByCategory,
+  formatCents,
+  formatLocalDate,
+  monthDateRange,
+} from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
+import { CategoryBars } from '@/components/reports/category-bars';
+import { EntryList } from '@/components/reports/entry-list';
+import { FilterChips } from '@/components/reports/filter-chips';
+import { useReportData } from '@/components/reports/use-report-data';
+import { useReportsGate } from '@/components/reports/use-reports-gate';
 import { Button } from '@/components/ui/button';
-import { CurrencyText } from '@/components/ui/currency-text';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ProgressBar } from '@/components/ui/progress-bar';
+import { LimitNotice } from '@/components/ui/limit-notice';
 import { Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { SectionCard } from '@/components/ui/section-card';
-import { useAuth } from '@/contexts/auth-context';
-import { supabase } from '@/lib/supabase';
+import { StatTile } from '@/components/ui/stat-tile';
 import { Space } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 
 type RangeOption = '1' | '3' | '6' | 'all';
 const RANGE_LABELS: Record<RangeOption, string> = {
@@ -23,80 +33,109 @@ const RANGE_LABELS: Record<RangeOption, string> = {
   all: 'All time',
 };
 
-function fromDateFor(range: RangeOption): string | undefined {
-  if (range === 'all') return undefined;
-  const monthsBack = Number(range);
+function rangeFor(option: RangeOption): { fromDate?: string; toDate?: string } {
+  if (option === 'all') return {};
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
-  return formatLocalDate(from);
+  const monthsBack = Number(option);
+  return {
+    fromDate: formatLocalDate(new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1)),
+    toDate: monthDateRange(now.getFullYear(), now.getMonth()).toDate,
+  };
 }
 
 export default function ReportSpendingScreen() {
-  const { status, user } = useAuth();
-  const [range, setRange] = useState<RangeOption>('3');
-  const [totals, setTotals] = useState<CategoryTotal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { status } = useAuth();
+  const { gate, isLoading: isGateLoading } = useReportsGate();
+  const [option, setOption] = useState<RangeOption>('3');
+  const [category, setCategory] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    if (status !== 'signedIn' || !user) return;
-    setIsLoading(true);
-    const [payments, categories] = await Promise.all([
-      listBillPaymentsForReports(supabase, user.id, { fromDate: fromDateFor(range) }),
-      listCategories(supabase, user.id),
-    ]);
-    setTotals(
-      calculateCategoryTotals(
-        payments.map((p) => ({ categoryId: p.category_id, amountCents: p.amount_cents })),
-        categories
-      )
-    );
-    setIsLoading(false);
-  }, [status, user, range]);
+  const canView = gate?.allowed === true;
+  // Guests browse the sample data, which sits in past months — an open range shows it all.
+  const range = status === 'guest' ? {} : rangeFor(option);
+  const data = useReportData(range, canView);
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload])
-  );
-
-  const maxTotal = Math.max(...totals.map((t) => t.totalCents), 1);
-  const grandTotal = totals.reduce((sum, t) => sum + t.totalCents, 0);
+  const spentCents = data.categoryTotals.reduce((sum, t) => sum + t.totalCents, 0);
+  const activeCategory =
+    category &&
+    data.categoryTotals.some((t) => t.categoryName.toLowerCase() === category.toLowerCase())
+      ? category
+      : null;
+  const visibleEntries = filterEntriesByCategory(data.entries, activeCategory);
 
   return (
-    <Screen>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-        {(Object.keys(RANGE_LABELS) as RangeOption[]).map((option) => (
-          <Button
-            key={option}
-            label={RANGE_LABELS[option]}
-            variant={option === range ? 'primary' : 'secondary'}
-            onPress={() => setRange(option)}
-          />
-        ))}
-      </View>
+    <Screen showGuestBanner>
+      <Stack.Screen options={{ title: 'Spending by category' }} />
+      <ScreenHeader
+        title="Spending by category"
+        subtitle="Bill payments, debt payments and grocery receipts, grouped."
+      />
 
-      {isLoading ? (
-        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-      ) : totals.length === 0 ? (
+      {status !== 'guest' ? (
+        <FilterChips
+          accessibilityLabel="Time range"
+          allLabel={RANGE_LABELS['1']}
+          options={[RANGE_LABELS['3'], RANGE_LABELS['6'], RANGE_LABELS.all]}
+          value={option === '1' ? null : RANGE_LABELS[option]}
+          onChange={(label) => {
+            const next = (Object.keys(RANGE_LABELS) as RangeOption[]).find(
+              (key) => RANGE_LABELS[key] === label
+            );
+            setOption(next ?? '1');
+          }}
+        />
+      ) : null}
+
+      {isGateLoading || data.isLoading ? (
+        <Card>
+          <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+        </Card>
+      ) : !canView ? (
+        <LimitNotice
+          title="Full reports are on a higher plan"
+          reason={gate?.reason ?? "We couldn't check your plan just now. Please try again."}
+        />
+      ) : data.errorMessage ? (
+        <Card style={{ gap: Space[3] }}>
+          <ThemedText themeColor="warning">{data.errorMessage}</ThemedText>
+          <View style={{ flexDirection: 'row' }}>
+            <Button label="Try again" variant="secondary" onPress={data.refresh} />
+          </View>
+        </Card>
+      ) : data.categoryTotals.length === 0 ? (
         <EmptyState
-          title="No bill payments in this range"
-          message="Record a bill payment from the Bills tab to see spending broken down here."
+          mascot
+          title="No spending in this range"
+          message="Record a bill payment from the Bills tab or save a grocery receipt to see spending broken down here."
         />
       ) : (
         <>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space[2] }}>
-            <ThemedText themeColor="textSecondary">Total</ThemedText>
-            <CurrencyText cents={grandTotal} size="row" themeColor="textSecondary" />
-          </View>
-          {totals.map((category) => (
-            <SectionCard
-              key={category.categoryId ?? 'uncategorized'}
-              title={category.categoryName}
-              action={<CurrencyText cents={category.totalCents} size="row" />}
-            >
-              <ProgressBar percent={(category.totalCents / maxTotal) * 100} />
-            </SectionCard>
-          ))}
+          <StatTile
+            label="Total spending"
+            valueCents={spentCents}
+            glyph="≡"
+            glyphColor="textSecondary"
+            glyphTint="backgroundSelected"
+            description={`${data.entries.length} payment${data.entries.length === 1 ? '' : 's'} across ${data.categoryTotals.length} categor${data.categoryTotals.length === 1 ? 'y' : 'ies'}.`}
+          />
+          <SectionCard
+            title={activeCategory ?? 'All categories'}
+            action={
+              activeCategory ? (
+                <ThemedText type="smallBold">
+                  {formatCents(visibleEntries.reduce((sum, e) => sum + e.amountCents, 0))}
+                </ThemedText>
+              ) : null
+            }
+          >
+            <View style={{ gap: Space[4] }}>
+              <CategoryBars
+                totals={data.categoryTotals}
+                selected={activeCategory}
+                onSelect={setCategory}
+              />
+              {activeCategory ? <EntryList entries={visibleEntries} /> : null}
+            </View>
+          </SectionCard>
         </>
       )}
     </Screen>

@@ -1,26 +1,29 @@
-import { Pressable, Switch, View } from 'react-native';
-import { formatCents } from '@own-my-budget/core';
+import { View } from 'react-native';
+import { formatCentsCompact } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { CheckboxField } from '@/components/ui/checkbox-field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ProgressBar, type ProgressTone } from '@/components/ui/progress-bar';
 import { StatusPill, type StatusTone } from '@/components/ui/status-pill';
-import { Space } from '@/constants/theme';
+import { CardShadow, Fonts, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { LabelText, PlanLine } from './common';
+import { PlanLine, useMeasuredWidth } from './common';
 import type { PlanSummary } from './use-bills-debt-data';
-import { longDate, type BillDisplayStatus, type BillItem } from './view-models';
+import { shortDate, type BillDisplayStatus, type BillItem } from './view-models';
 
-// Every state carries a word (and a glyph for paid/overdue) so status never
-// depends on color alone. Overdue is the only clay state; the rest stay calm.
+// Every state carries a word so status never depends on color alone. Overdue
+// is the only clay state; Due is a calm mustard, Partial a calm blue.
 const STATUS: Record<BillDisplayStatus, { label: string; tone: StatusTone; bar: ProgressTone }> = {
-  paid: { label: '✓ Paid', tone: 'success', bar: 'success' },
-  overdue: { label: '! Overdue', tone: 'danger', bar: 'danger' },
-  partial: { label: 'Partial', tone: 'neutral', bar: 'primary' },
-  due: { label: 'Due', tone: 'neutral', bar: 'primary' },
+  paid: { label: 'Paid', tone: 'success', bar: 'success' },
+  overdue: { label: 'Overdue', tone: 'danger', bar: 'danger' },
+  partial: { label: 'Partial', tone: 'info', bar: 'primary' },
+  due: { label: 'Due', tone: 'warning', bar: 'primary' },
 };
+
+/** Below this row width the bill row stacks instead of laying out on one line. */
+const WIDE_ROW = 780;
 
 export interface BillsTabProps {
   bills: BillItem[];
@@ -59,7 +62,7 @@ export function BillsTab({
   return (
     <View style={{ gap: Space[3] }}>
       {bills.map((bill) => (
-        <BillCard
+        <BillRowCard
           key={bill.id}
           bill={bill}
           plan={plans[`bill:${bill.id}`]}
@@ -72,7 +75,7 @@ export function BillsTab({
   );
 }
 
-function BillCard({
+function BillRowCard({
   bill,
   plan,
   onLogPayment,
@@ -86,82 +89,95 @@ function BillCard({
   onToggleReminder: (enabled: boolean) => void;
 }) {
   const theme = useTheme();
+  const [width, onLayout] = useMeasuredWidth();
+  const wide = width >= WIDE_ROW;
   const status = STATUS[bill.displayStatus];
   const percent = bill.amountCents > 0 ? (bill.paidCents / bill.amountCents) * 100 : 0;
 
+  const title = (
+    <View style={{ gap: 2, minWidth: 0, flex: wide ? 1 : undefined }}>
+      <ThemedText style={{ fontFamily: Fonts.heading.semibold, fontSize: 18, lineHeight: 24 }}>
+        {bill.label}
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Due {shortDate(bill.dueDate)}
+      </ThemedText>
+    </View>
+  );
+  const progress = (
+    <View style={{ gap: Space[1], flex: wide ? 1.3 : undefined, minWidth: 0 }}>
+      <ProgressBar percent={percent} tone={status.bar} />
+      <ThemedText type="small" themeColor="textSecondary">
+        {formatCentsCompact(bill.paidCents)} of {formatCentsCompact(bill.amountCents)}
+      </ThemedText>
+    </View>
+  );
+  const pill = <StatusPill label={status.label} tone={status.tone} filled />;
+  const actions = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[2] }}>
+      <CheckboxField
+        label="Remind"
+        checked={bill.reminderEnabled}
+        onChange={onToggleReminder}
+        subtle
+      />
+      <Button
+        label="Log payment"
+        size="sm"
+        shape="rounded"
+        accessibilityLabel={`Log payment for ${bill.label}`}
+        onPress={onLogPayment}
+      />
+      <Button
+        label="Plan payment"
+        size="sm"
+        shape="rounded"
+        variant="soft"
+        accessibilityLabel={`Plan payment for ${bill.label}`}
+        onPress={onPlanPayment}
+      />
+    </View>
+  );
+
   return (
-    <Card style={{ gap: Space[3] }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+    <View
+      onLayout={onLayout}
+      style={[
+        {
+          backgroundColor: theme.backgroundElement,
+          borderRadius: Radius.card,
+          paddingVertical: Space[4],
+          paddingHorizontal: Space[5],
           gap: Space[3],
-        }}
-      >
-        <View style={{ flexShrink: 1, minWidth: 160 }}>
-          <LabelText>{bill.label}</LabelText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Due {longDate(bill.dueDate)}
-          </ThemedText>
+        },
+        CardShadow,
+      ]}
+    >
+      {wide ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[5] }}>
+          {title}
+          {progress}
+          <View style={{ width: 84, alignItems: 'center' }}>{pill}</View>
+          {actions}
         </View>
-        <StatusPill label={status.label} tone={status.tone} />
-      </View>
-
-      <View style={{ gap: Space[1] }}>
-        <ProgressBar percent={percent} tone={status.bar} />
-        <ThemedText type="small" themeColor="textSecondary">
-          {formatCents(bill.paidCents)} of {formatCents(bill.amountCents)} paid
-          {bill.remainingCents > 0 && bill.paidCents > 0
-            ? ` · ${formatCents(bill.remainingCents)} left`
-            : ''}
-        </ThemedText>
-      </View>
-
-      {plan && plan.paydayCount > 0 ? <PlanLine plan={plan} /> : null}
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[2] }}>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityLabel={`Remind me about ${bill.label}`}
-          accessibilityState={{ checked: bill.reminderEnabled }}
-          onPress={() => onToggleReminder(!bill.reminderEnabled)}
-          style={{
-            minHeight: 44,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: Space[2],
-            paddingRight: Space[2],
-          }}
-        >
-          {/* Display only — the whole row is the switch, so taps never double-fire on web. */}
-          <View pointerEvents="none">
-            <Switch
-              value={bill.reminderEnabled}
-              accessible={false}
-              importantForAccessibility="no"
-              trackColor={{ false: theme.controlBorder, true: theme.primary }}
-              thumbColor={theme.backgroundElement}
-            />
+      ) : (
+        <>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: Space[3],
+            }}
+          >
+            {title}
+            {pill}
           </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            Remind
-          </ThemedText>
-        </Pressable>
-        <Button
-          label="Log payment"
-          variant={bill.displayStatus === 'paid' ? 'secondary' : 'primary'}
-          accessibilityLabel={`Log a payment for ${bill.label}`}
-          onPress={onLogPayment}
-        />
-        <Button
-          label="Plan payment"
-          variant="secondary"
-          accessibilityLabel={`Plan a payment for ${bill.label}`}
-          onPress={onPlanPayment}
-        />
-      </View>
-    </Card>
+          {progress}
+          {actions}
+        </>
+      )}
+      {plan && plan.paydayCount > 0 ? <PlanLine plan={plan} /> : null}
+    </View>
   );
 }

@@ -140,7 +140,8 @@ export function calculateEmergencyFundTarget(monthlyExpensesCents: number, month
   return Math.round(monthlyExpensesCents * months);
 }
 
-export type GoalStatus = 'completed' | 'notStarted' | 'onTrack' | 'behind' | 'inProgress';
+export type GoalStatus =
+  'completed' | 'paused' | 'notStarted' | 'onTrack' | 'behind' | 'inProgress';
 
 export interface GoalStatusInput {
   savedCents: number;
@@ -149,6 +150,8 @@ export interface GoalStatusInput {
   startDate?: string | null;
   targetDate?: string | null;
   today?: Date;
+  /** A paused goal keeps its balance but is not measured against a pace. */
+  paused?: boolean;
 }
 
 /**
@@ -162,8 +165,10 @@ export function getGoalStatus({
   startDate,
   targetDate,
   today = new Date(),
+  paused = false,
 }: GoalStatusInput): GoalStatus {
   if (targetCents > 0 && savedCents >= targetCents) return 'completed';
+  if (paused) return 'paused';
   if (savedCents <= 0) return 'notStarted';
   if (!targetDate || !startDate || targetCents <= 0) return 'inProgress';
 
@@ -185,12 +190,12 @@ export function getGoalStatus({
 export function suggestedContributionCents(
   remainingCents: number,
   targetDate: string | null | undefined,
-  unit: 'weekly' | 'monthly',
+  unit: 'weekly' | 'biweekly' | 'monthly',
   today: Date = new Date()
 ): number | null {
   if (remainingCents <= 0 || !targetDate) return null;
   const msLeft = parseLocalDate(targetDate.slice(0, 10)).getTime() - today.getTime();
-  const daysPerPeriod = unit === 'weekly' ? 7 : 30.4375;
+  const daysPerPeriod = unit === 'weekly' ? 7 : unit === 'biweekly' ? 14 : 30.4375;
   const periods = Math.max(1, Math.ceil(msLeft / 86_400_000 / daysPerPeriod));
   return Math.ceil(remainingCents / periods);
 }
@@ -331,6 +336,33 @@ export function buildChallengeBlocks(
   return blocks;
 }
 
+/**
+ * The date on which a run of `length` consecutive calendar weeks (Monday-start) with a
+ * date each was first reached — i.e. the day the "4 weekly deposits" badge was earned.
+ * Null when no such run exists.
+ */
+export function weeklyStreakReachedOn(dates: string[], length: number): string | null {
+  const byWeek = new Map<number, string>();
+  for (const iso of dates) {
+    const day = iso.slice(0, 10);
+    const [y, m, d] = day.split('-').map(Number);
+    if (!y || !m || !d) continue;
+    const week = Math.floor((Math.floor(Date.UTC(y, m - 1, d) / 86_400_000) + 3) / 7);
+    const seen = byWeek.get(week);
+    // Keep the earliest date in each week: the badge is earned by the first deposit of the run's last week.
+    if (!seen || day < seen) byWeek.set(week, day);
+  }
+  const weeks = [...byWeek.keys()].sort((a, b) => a - b);
+  let run = 0;
+  let previous: number | null = null;
+  for (const week of weeks) {
+    run = previous !== null && week === previous + 1 ? run + 1 : 1;
+    previous = week;
+    if (run >= length) return byWeek.get(week) ?? null;
+  }
+  return null;
+}
+
 /** The longest run of consecutive calendar weeks (Monday-start) that each contain at least one date. */
 export function longestWeeklyStreak(dates: string[]): number {
   const weeks = new Set<number>();
@@ -457,6 +489,8 @@ export interface AchievementSignals {
     challengeType: ChallengeType;
     totalWeeks: number;
     createdAt: string;
+    /** Weeks actually logged. When omitted it is estimated from the goal's saved total. */
+    completedWeeks?: number;
   }[];
   /** Deposit rows only (withdrawals excluded). */
   deposits: { goalId: string; amountCents: number; occurredOn: string }[];
@@ -467,6 +501,9 @@ export interface AchievementSignals {
   billsPaid: number;
   hasPaidOffDebt: boolean;
   hasAssignedPaycheck: boolean;
+  /** When those last two were first true (YYYY-MM-DD) — the badges' "Earned" dates. */
+  budgetPlanSince?: string | null;
+  paycheckAssignedSince?: string | null;
 }
 
 export interface BadgeProgress {
@@ -515,7 +552,7 @@ export function evaluateBadges(signals: AchievementSignals): BadgeStatus[] {
       challenge.totalWeeks,
       goal.targetCents
     );
-    const weeksDone = challengeWeeksCompleted(goal.savedCents, amounts);
+    const weeksDone = challenge.completedWeeks ?? challengeWeeksCompleted(goal.savedCents, amounts);
     if (weeksDone >= bestWeeksDone) {
       bestWeeksDone = weeksDone;
       bestTotalWeeks = challenge.totalWeeks;
@@ -556,6 +593,12 @@ export function evaluateBadges(signals: AchievementSignals): BadgeStatus[] {
       completedEmergency.map((g) => completionDate(g.id, deposits)).filter((d): d is string => !!d)
     ),
     challengeStarter: earliest(challenges.map((c) => c.createdAt)),
+    streakSaver: weeklyStreakReachedOn(
+      deposits.map((d) => d.occurredOn),
+      4
+    ),
+    budgetBuilder: signals.budgetPlanSince ?? null,
+    paycheckPlanner: signals.paycheckAssignedSince ?? null,
   };
 
   const progress: Partial<Record<BadgeId, BadgeProgress | null>> = {
@@ -672,8 +715,253 @@ export function evaluateMissions(
     reviewSubscriptions: 0,
   };
   return MISSION_DEFINITIONS.map((definition) => {
-    const manualDone = definition.manual && !!manuallyCompleted[definition.id];
+    // "Mark complete" works on every mission: a person can always say "I did this".
+    const manualDone = !!manuallyCompleted[definition.id];
     const progress = manualDone ? 100 : Math.min(100, Math.max(0, Math.round(raw[definition.id])));
     return { ...definition, progress, done: progress >= 100 };
   });
+}
+
+// --- Goal fields (category, frequency, colors) -------------------------------
+
+export const GOAL_FREQUENCIES = ['weekly', 'biweekly', 'monthly'] as const;
+export type GoalFrequency = (typeof GOAL_FREQUENCIES)[number];
+
+export const GOAL_FREQUENCY_LABELS: Record<GoalFrequency, string> = {
+  weekly: 'Weekly',
+  biweekly: 'Biweekly',
+  monthly: 'Monthly',
+};
+
+/** A goal's stored category when it is one we know, otherwise inferred from its label. */
+export function resolveGoalCategory(
+  stored: string | null | undefined,
+  label: string
+): GoalCategory {
+  const known = GOAL_CATEGORIES.find((c) => c === stored);
+  return known ?? inferGoalCategory(label);
+}
+
+/** Reads a stored frequency, defaulting to monthly for anything unexpected. */
+export function resolveGoalFrequency(stored: string | null | undefined): GoalFrequency {
+  return GOAL_FREQUENCIES.find((f) => f === stored) ?? 'monthly';
+}
+
+// --- 52-week challenge: multiplier, dates, blocks -----------------------------
+
+/** The dollar multipliers the challenge dialog offers ("$1 Multiplier", ...). */
+export const CHALLENGE_MULTIPLIERS = [1, 2, 5, 10] as const;
+
+/** Total of a classic challenge: 1+2+...+N periods, each times `multiplier` dollars. */
+export function challengeTargetCents(totalPeriods: number, multiplier: number): number {
+  if (!(totalPeriods > 0) || !(multiplier > 0)) return 0;
+  return Math.round(((totalPeriods * (totalPeriods + 1)) / 2) * multiplier * 100);
+}
+
+/** The estimated end of a challenge: `startDate` plus `totalPeriods` weekly/biweekly periods (design: Jan 5 -> Jan 4, 2027). */
+export function challengeEndDate(
+  startDate: string,
+  totalPeriods: number,
+  cadence: 'weekly' | 'biweekly' = 'weekly'
+): string {
+  const start = parseLocalDate(startDate.slice(0, 10));
+  const days = totalPeriods * (cadence === 'biweekly' ? 14 : 7);
+  return formatLocalDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + days));
+}
+
+export type ChallengeBlockStatus = 'completed' | 'inProgress' | 'notStarted';
+
+export interface ChallengeBlockWeek {
+  week: number;
+  /** What the week's deposit should be at the current multiplier. */
+  targetCents: number;
+  /** What was actually recorded for it. */
+  savedCents: number;
+  done: boolean;
+}
+
+export interface ChallengeBlockDetail {
+  /** 1-based block number, also the key of its note. */
+  index: number;
+  startWeek: number;
+  endWeek: number;
+  /** "Weeks 1-5" (or "Week 52" for a single-week block). */
+  label: string;
+  weeks: ChallengeBlockWeek[];
+  savedCents: number;
+  targetCents: number;
+  doneCount: number;
+  allDone: boolean;
+  status: ChallengeBlockStatus;
+}
+
+/**
+ * The challenge grouped into blocks of `blockSize` weeks, with what was saved
+ * against each block's target. `recordedByWeek` maps a week number to the cents
+ * actually logged for it, so weeks can be completed in any order.
+ */
+export function buildChallengeBlocksFromRecords(
+  weeklyTargetsCents: number[],
+  recordedByWeek: Record<number, number>,
+  blockSize = 5
+): ChallengeBlockDetail[] {
+  const blocks: ChallengeBlockDetail[] = [];
+  for (let start = 0; start < weeklyTargetsCents.length; start += blockSize) {
+    const weeks: ChallengeBlockWeek[] = weeklyTargetsCents
+      .slice(start, start + blockSize)
+      .map((targetCents, offset) => {
+        const week = start + offset + 1;
+        const recorded = recordedByWeek[week];
+        return { week, targetCents, savedCents: recorded ?? 0, done: recorded !== undefined };
+      });
+    const doneCount = weeks.filter((w) => w.done).length;
+    const startWeek = weeks[0].week;
+    const endWeek = weeks[weeks.length - 1].week;
+    blocks.push({
+      index: blocks.length + 1,
+      startWeek,
+      endWeek,
+      label: startWeek === endWeek ? `Week ${startWeek}` : `Weeks ${startWeek}-${endWeek}`,
+      weeks,
+      savedCents: weeks.reduce((sum, w) => sum + w.savedCents, 0),
+      targetCents: weeks.reduce((sum, w) => sum + w.targetCents, 0),
+      doneCount,
+      allDone: doneCount === weeks.length,
+      status:
+        doneCount === weeks.length ? 'completed' : doneCount > 0 ? 'inProgress' : 'notStarted',
+    });
+  }
+  return blocks;
+}
+
+// --- Recent savings activity feed ---------------------------------------------
+
+export type SavingsActivityKind =
+  'deposit' | 'withdrawal' | 'challengeDeposit' | 'goalCreated' | 'goalCompleted' | 'badgeEarned';
+
+export const SAVINGS_ACTIVITY_LABELS: Record<SavingsActivityKind, string> = {
+  deposit: 'Deposit',
+  withdrawal: 'Withdrawal',
+  challengeDeposit: 'Challenge Deposit',
+  goalCreated: 'Goal Created',
+  goalCompleted: 'Goal Completed',
+  badgeEarned: 'Badge Earned',
+};
+
+export interface SavingsActivityEvent {
+  id: string;
+  kind: SavingsActivityKind;
+  /** The goal or badge the row is about. */
+  title: string;
+  /** YYYY-MM-DD */
+  date: string;
+  amountCents: number | null;
+  note: string | null;
+}
+
+export interface SavingsActivityInput {
+  goals: {
+    id: string;
+    label: string;
+    isChallenge: boolean;
+    savedCents: number;
+    targetCents: number;
+    /** YYYY-MM-DD the goal was created / started. */
+    createdOn: string;
+  }[];
+  activity: {
+    id: string;
+    goalId: string;
+    kind: string;
+    amountCents: number;
+    occurredOn: string;
+    note: string | null;
+  }[];
+  badges: { id: string; name: string; earned: boolean; earnedOn: string | null }[];
+}
+
+/** One newest-first feed of deposits, withdrawals, goals created/completed and badges earned. */
+export function buildSavingsActivity(input: SavingsActivityInput): SavingsActivityEvent[] {
+  const goalsById = new Map(input.goals.map((g) => [g.id, g]));
+  const events: SavingsActivityEvent[] = [];
+
+  for (const badge of input.badges) {
+    if (badge.earned && badge.earnedOn) {
+      events.push({
+        id: `badge-${badge.id}`,
+        kind: 'badgeEarned',
+        title: badge.name,
+        date: badge.earnedOn.slice(0, 10),
+        amountCents: null,
+        note: null,
+      });
+    }
+  }
+
+  for (const goal of input.goals) {
+    if (goal.isChallenge || !(goal.targetCents > 0) || goal.savedCents < goal.targetCents) continue;
+    const dates = input.activity
+      .filter((a) => a.goalId === goal.id && a.kind === 'deposit')
+      .map((a) => a.occurredOn.slice(0, 10));
+    if (dates.length === 0) continue;
+    events.push({
+      id: `completed-${goal.id}`,
+      kind: 'goalCompleted',
+      title: goal.label,
+      date: dates.reduce((a, b) => (a > b ? a : b)),
+      amountCents: goal.targetCents,
+      note: null,
+    });
+  }
+
+  for (const row of input.activity) {
+    const goal = goalsById.get(row.goalId);
+    if (!goal) continue;
+    events.push({
+      id: row.id,
+      kind:
+        row.kind === 'withdrawal'
+          ? 'withdrawal'
+          : goal.isChallenge
+            ? 'challengeDeposit'
+            : 'deposit',
+      title: goal.label,
+      date: row.occurredOn.slice(0, 10),
+      amountCents: row.amountCents,
+      note: row.note,
+    });
+  }
+
+  for (const goal of input.goals) {
+    if (goal.isChallenge) continue;
+    events.push({
+      id: `created-${goal.id}`,
+      kind: 'goalCreated',
+      title: goal.label,
+      date: goal.createdOn.slice(0, 10),
+      amountCents: null,
+      note: null,
+    });
+  }
+
+  // Array.prototype.sort is stable, so same-day rows keep the order they were pushed in.
+  return events.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+export type SavingsActivityFilter = 'all' | 'deposits' | 'goals' | 'challenges';
+
+export function filterSavingsActivity(
+  events: SavingsActivityEvent[],
+  filter: SavingsActivityFilter
+): SavingsActivityEvent[] {
+  switch (filter) {
+    case 'deposits':
+      return events.filter((e) => e.kind === 'deposit' || e.kind === 'withdrawal');
+    case 'goals':
+      return events.filter((e) => e.kind === 'goalCreated' || e.kind === 'goalCompleted');
+    case 'challenges':
+      return events.filter((e) => e.kind === 'challengeDeposit');
+    default:
+      return events;
+  }
 }

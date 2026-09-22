@@ -292,4 +292,15 @@ describe('evaluateMissions', () => {
     expect(withManual.find((m) => m.id === 'reviewSubscriptions')?.done).toBe(true);
     expect(withManual.find((m) => m.id === 'emergencyCushion')?.progress).toBe(0);
   });
+
+  it('lets any mission be marked complete by hand', () => {
+    const missions = evaluateMissions(
+      { trackedDays: 2, depositsThisMonth: 1, emergencyPercent: 35 },
+      { emergencyCushion: true, monthlyDeposits: true }
+    );
+    const byId = Object.fromEntries(missions.map((m) => [m.id, m]));
+    expect(byId.emergencyCushion).toMatchObject({ progress: 100, done: true });
+    expect(byId.monthlyDeposits).toMatchObject({ progress: 100, done: true });
+    expect(byId.trackExpenses.done).toBe(false);
+  });
 });

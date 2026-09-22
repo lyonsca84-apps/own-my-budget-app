@@ -17,3 +17,4 @@ export * from './queries/receipts';
 export * from './queries/groceries';
 export * from './queries/reports';
 export * from './queries/notification-preferences';
+export * from './guest';

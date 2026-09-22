@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import {
   calculatePayoffComparison,
   calculatePayoffSchedule,
@@ -15,13 +15,19 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { TextField } from '@/components/ui/text-field';
-import { Radius, Space } from '@/constants/theme';
+import { Fonts, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { LabelText, formatDollarsInput, parseDollarsToCents, useSyncedText } from './common';
-import { SummaryTile, SummaryTiles } from './detail-grid';
+import {
+  ResponsiveGrid,
+  formatDollarsInput,
+  formatWholeDollars,
+  parseDollarsToCents,
+  useSyncedText,
+} from './common';
 import type { PayoffPrefs } from './use-bills-debt-data';
-import { formatApr, type DebtItem } from './view-models';
+import { aprOrUnknown, type DebtItem } from './view-models';
 
 export interface PayoffTabProps {
   cards: DebtItem[];
@@ -32,6 +38,13 @@ export interface PayoffTabProps {
   onSavePrefs: (changes: Partial<PayoffPrefs>) => Promise<void>;
   onSeePlans: () => void;
 }
+
+const HEADING = { fontFamily: Fonts.heading.semibold, fontSize: 18, lineHeight: 24 } as const;
+
+const STRATEGY_OPTIONS: { value: PayoffStrategy; label: string }[] = [
+  { value: 'snowball', label: 'Snowball' },
+  { value: 'avalanche', label: 'Avalanche ★' },
+];
 
 const EXPLAINER: Record<PayoffStrategy, string> = {
   snowball: 'Smallest balance first — quick wins to build momentum.',
@@ -134,53 +147,18 @@ export function PayoffTab({
             gap: Space[3],
           }}
         >
-          <LabelText>Debt payoff plan</LabelText>
-          <View
-            accessibilityRole="tablist"
-            style={{
-              flexDirection: 'row',
-              backgroundColor: theme.backgroundSelected,
-              borderRadius: Radius.full,
-              padding: 4,
-              gap: 2,
-            }}
-          >
-            {(['snowball', 'avalanche'] as const).map((option) => {
-              const selected = strategy === option;
-              const locked = option === 'avalanche' && !canUseAvalanche;
-              return (
-                <Pressable
-                  key={option}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={
-                    locked
-                      ? 'Avalanche, a Premium feature'
-                      : option === 'snowball'
-                        ? 'Snowball'
-                        : 'Avalanche'
-                  }
-                  onPress={() => choose(option)}
-                  style={{
-                    minHeight: 44,
-                    paddingHorizontal: Space[4],
-                    borderRadius: Radius.full,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: selected ? theme.panel : 'transparent',
-                  }}
-                >
-                  <ThemedText type="smallBold" themeColor={selected ? 'onPanel' : 'textSecondary'}>
-                    {option === 'snowball'
-                      ? 'Snowball'
-                      : locked
-                        ? 'Avalanche ★ Premium'
-                        : 'Avalanche'}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
+          <ThemedText accessibilityRole="header" style={HEADING}>
+            Debt payoff plan
+          </ThemedText>
+          <SegmentedControl
+            variant="soft"
+            size="sm"
+            accessibilityLabel="Payoff strategy"
+            options={STRATEGY_OPTIONS}
+            // Free accounts see Snowball selected; tapping Avalanche shows the upgrade card instead.
+            value={strategy}
+            onChange={choose}
+          />
         </View>
 
         {showUpgrade && !canUseAvalanche ? (
@@ -199,7 +177,7 @@ export function PayoffTab({
               strategies side by side.
             </ThemedText>
             <View style={{ alignSelf: 'flex-start' }}>
-              <Button label="See plans" onPress={onSeePlans} />
+              <Button label="See plans" size="sm" shape="rounded" onPress={onSeePlans} />
             </View>
           </View>
         ) : null}
@@ -212,19 +190,20 @@ export function PayoffTab({
           {ordered.map((entry, index) => {
             const debt = byId.get(entry.id);
             if (!debt) return null;
-            const month = comparison.withExtra.monthsToPayoffByDebt[entry.id];
             return (
               <View
                 key={entry.id}
                 accessible
-                accessibilityLabel={`Number ${index + 1}: ${debt.label}, ${formatApr(
-                  debt.aprBasisPoints
-                )} APR, balance ${formatCents(debt.balanceCents)}`}
+                accessibilityLabel={`Number ${index + 1}: ${debt.label}, APR ${aprOrUnknown(
+                  debt.aprBasisPoints,
+                  'unknown'
+                )}, balance ${formatCents(debt.balanceCents)}`}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: Space[3],
-                  padding: Space[3],
+                  paddingVertical: Space[3],
+                  paddingHorizontal: Space[4],
                   borderRadius: Radius.smallCard,
                   borderWidth: 1,
                   borderColor: theme.border,
@@ -235,25 +214,22 @@ export function PayoffTab({
                     width: 32,
                     height: 32,
                     borderRadius: 16,
-                    backgroundColor: theme.primaryMuted,
+                    backgroundColor: theme.accentMuted,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <ThemedText type="smallBold" themeColor="primary">
+                  <ThemedText type="smallBold" themeColor="solidAccent">
                     {index + 1}
                   </ThemedText>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <LabelText>{debt.label}</LabelText>
+                  <ThemedText style={{ fontFamily: Fonts.body.semibold }}>{debt.label}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    APR {formatApr(debt.aprBasisPoints)}
-                    {month !== undefined && comparison.withExtra.completed
-                      ? ` · clear by ${monthYear(addMonthsIso(month))}`
-                      : ''}
+                    APR {aprOrUnknown(debt.aprBasisPoints, 'Unknown')}
                   </ThemedText>
                 </View>
-                <ThemedText type="amountSmall">{formatCents(debt.balanceCents)}</ThemedText>
+                <ThemedText type="amountSmall">{formatWholeDollars(debt.balanceCents)}</ThemedText>
               </View>
             );
           })}
@@ -261,29 +237,37 @@ export function PayoffTab({
       </Card>
 
       <Card style={{ gap: Space[4] }}>
-        <LabelText>Payoff calculator</LabelText>
-        <View style={{ maxWidth: 260 }}>
-          <TextField
-            label="Extra amount per month ($)"
-            value={extraText}
-            onChangeText={setExtraText}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            onBlur={() => onSavePrefs({ extraMonthlyCents: extraCents })}
-          />
+        <ThemedText accessibilityRole="header" style={HEADING}>
+          Payoff calculator
+        </ThemedText>
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[3] }}
+        >
+          <ThemedText themeColor="textSecondary">Extra amount per month</ThemedText>
+          <View style={{ width: 160 }}>
+            <TextField
+              label="Extra amount per month"
+              hideLabel
+              value={extraText}
+              onChangeText={setExtraText}
+              placeholder="0"
+              keyboardType="decimal-pad"
+              onBlur={() => onSavePrefs({ extraMonthlyCents: extraCents })}
+            />
+          </View>
         </View>
-        <SummaryTiles>
-          <SummaryTile label="Minimum payments only" value={monthsText(comparison.minimumOnly)} />
-          <SummaryTile
+        <ResponsiveGrid minCell={200} maxColumns={4} gap={Space[3]}>
+          <ResultTile label="Minimum payments only" value={monthsText(comparison.minimumOnly)} />
+          <ResultTile
             label="With extra payment"
             value={monthsText(comparison.withExtra)}
-            tone="accent"
+            highlight
           />
-          <SummaryTile
+          <ResultTile
             label="Time saved"
             value={comparison.monthsSaved !== null ? `${comparison.monthsSaved} months` : '—'}
           />
-          <SummaryTile
+          <ResultTile
             label="Est. interest saved"
             value={
               comparison.interestSavedCents !== null
@@ -291,7 +275,7 @@ export function PayoffTab({
                 : '—'
             }
           />
-        </SummaryTiles>
+        </ResponsiveGrid>
         {!comparison.minimumOnly.completed ? (
           <ThemedText type="small" themeColor="textSecondary">
             At the minimum payments alone, interest keeps pace with what you pay. Adding an extra
@@ -302,7 +286,9 @@ export function PayoffTab({
 
       {versus ? (
         <Card style={{ gap: Space[3] }}>
-          <LabelText>Snowball vs. avalanche</LabelText>
+          <ThemedText accessibilityRole="header" style={HEADING}>
+            Snowball vs. avalanche
+          </ThemedText>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
             {(['snowball', 'avalanche'] as const).map((name) => {
               const result = versus[name];
@@ -340,8 +326,42 @@ export function PayoffTab({
   );
 }
 
-function addMonthsIso(months: number): string {
-  const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth() + months, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+/** A calculator result: soft gray tile, the "with extra" one in the teal highlight. */
+function ResultTile({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${label}: ${value}`}
+      style={{
+        flex: 1,
+        gap: Space[1],
+        padding: Space[4],
+        borderRadius: Radius.smallCard,
+        backgroundColor: highlight ? theme.accentMuted : theme.backgroundSelected,
+      }}
+    >
+      <ThemedText type="smallBold" style={{ fontFamily: Fonts.body.medium }}>
+        {label}
+      </ThemedText>
+      <ThemedText
+        style={{
+          fontFamily: Fonts.heading.bold,
+          fontSize: 22,
+          lineHeight: 28,
+          letterSpacing: -0.22,
+        }}
+      >
+        {value}
+      </ThemedText>
+    </View>
+  );
 }

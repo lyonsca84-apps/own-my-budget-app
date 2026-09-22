@@ -1,4 +1,4 @@
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getDebt, recordDebtPayment, updateDebt, type Tables } from '@own-my-budget/api';
@@ -7,10 +7,10 @@ import { formatCents, formatLocalDate } from '@own-my-budget/core';
 import { ThemedText } from '@/components/themed-text';
 import { formatDollarsInput, parseDollarsToCents } from '@/components/bills/common';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Screen } from '@/components/ui/screen';
+import { DateField, isValidIsoDate } from '@/components/ui/date-field';
+import { DialogScreen } from '@/components/ui/dialog';
 import { TextField } from '@/components/ui/text-field';
-import { Space } from '@/constants/theme';
+import { Fonts, Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 interface Slot {
@@ -18,12 +18,11 @@ interface Slot {
   date: string;
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const newSlots = (): Slot[] =>
   [1, 2, 3].map(() => ({ amount: '', date: formatLocalDate(new Date()) }));
 
 /**
- * Manage payments for a card or loan: record up to three payments (each one
+ * "Manage payments" for a card or loan: record up to three payments (each one
  * goes through the transactional `record_debt_payment` function, so the
  * payment and the balance change always land together), adjust the amount due,
  * and — only if the balance is simply wrong — correct it.
@@ -69,11 +68,11 @@ export default function RecordDebtPaymentScreen() {
         setErrorMessage('Enter a valid amount for each payment.');
         return;
       }
-      if (!ISO_DATE.test(slot.date.trim())) {
-        setErrorMessage('Dates must look like YYYY-MM-DD.');
+      if (!isValidIsoDate(slot.date)) {
+        setErrorMessage('Choose a date for each payment.');
         return;
       }
-      payments.push({ amountCents: cents, paidOn: slot.date.trim() });
+      payments.push({ amountCents: cents, paidOn: slot.date });
     }
     const balanceCents = parseDollarsToCents(balance);
     const dueCents = parseDollarsToCents(amountDue);
@@ -104,97 +103,90 @@ export default function RecordDebtPaymentScreen() {
   const isCard = debt?.type === 'creditCard';
 
   return (
-    <Screen>
-      <Stack.Screen
-        options={{ title: debt ? `Manage payments — ${debt.label}` : 'Manage payments' }}
-      />
-
-      <ThemedText themeColor="textSecondary" type="small">
-        Record what you paid, and each payment lowers the balance. Partial payments are fine.
-      </ThemedText>
-
-      {debt ? (
-        <Card style={{ gap: Space[1] }}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Balance now
-          </ThemedText>
-          <ThemedText type="amount">{formatCents(debt.balance_cents)}</ThemedText>
-        </Card>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
-        <View style={{ flexGrow: 1, flexBasis: 200 }}>
-          <TextField
-            label="Amount due ($)"
-            value={amountDue}
-            onChangeText={setAmountDue}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-        </View>
-        <View style={{ flexGrow: 1, flexBasis: 200 }}>
-          <TextField
-            label="Correct the balance ($)"
-            value={balance}
-            onChangeText={setBalance}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-        </View>
-      </View>
-
-      <ThemedText type="smallBold" themeColor="primary">
-        Payments
-      </ThemedText>
-      {slots.map((slot, index) => (
-        <View key={index} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
-          <View style={{ flexGrow: 1, flexBasis: 160 }}>
+    <DialogScreen
+      title={debt ? `Manage payments — ${debt.label}` : 'Manage payments'}
+      subtitle={
+        isCard
+          ? 'Edit the balance, amount due, and log up to three payments.'
+          : 'Edit the balance, amount due, and log up to three payments. Payments lower the balance.'
+      }
+      primaryLabel="Save changes"
+      onPrimary={handleSave}
+      primaryDisabled={!debt}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+      size="lg"
+    >
+      <View style={{ gap: Space[3] }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
+          <View style={{ flexGrow: 1, flexBasis: 200 }}>
             <TextField
-              label={`Payment ${index + 1} amount ($)`}
-              value={slot.amount}
-              onChangeText={(amount) => updateSlot(index, { amount })}
+              label="Current balance"
+              value={balance}
+              onChangeText={setBalance}
               placeholder="0.00"
               keyboardType="decimal-pad"
             />
           </View>
-          <View style={{ flexGrow: 1, flexBasis: 160 }}>
+          <View style={{ flexGrow: 1, flexBasis: 200 }}>
             <TextField
-              label={`Payment ${index + 1} date`}
-              value={slot.date}
-              onChangeText={(date) => updateSlot(index, { date })}
-              placeholder="YYYY-MM-DD"
+              label="Amount due"
+              value={amountDue}
+              onChangeText={setAmountDue}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
             />
           </View>
         </View>
-      ))}
 
-      {debt && isCard ? (
-        <View style={{ alignSelf: 'flex-start' }}>
-          <Button
-            label={`Pay minimum (${formatCents(debt.minimum_payment_cents)})`}
-            variant="secondary"
-            onPress={() =>
-              updateSlot(0, {
-                amount: formatDollarsInput(debt.minimum_payment_cents),
-                date: formatLocalDate(new Date()),
-              })
-            }
-          />
-        </View>
-      ) : null}
-
-      {errorMessage ? (
-        <ThemedText type="small" themeColor="danger" accessibilityRole="alert">
-          {errorMessage}
+        <ThemedText
+          type="smallBold"
+          themeColor="solidAccent"
+          style={{ fontFamily: Fonts.body.semibold }}
+        >
+          Payments
         </ThemedText>
-      ) : null}
+        {slots.map((slot, index) => (
+          <View key={index} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
+            <View style={{ flexGrow: 1, flexBasis: 200 }}>
+              <TextField
+                label={`Payment ${index + 1} amount`}
+                hideLabel
+                value={slot.amount}
+                onChangeText={(amount) => updateSlot(index, { amount })}
+                placeholder="Amount"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200 }}>
+              <DateField
+                label={`Payment ${index + 1} date`}
+                hideLabel
+                value={slot.date}
+                onChange={(date) => updateSlot(index, { date })}
+              />
+            </View>
+          </View>
+        ))}
 
-      <Button
-        variant="panel"
-        label={isSubmitting ? 'Saving…' : 'Save changes'}
-        onPress={handleSave}
-        disabled={isSubmitting || !debt}
-      />
-    </Screen>
+        {debt ? (
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Button
+              label={`Pay minimum (${formatCents(debt.minimum_payment_cents)})`}
+              variant="soft"
+              size="sm"
+              shape="rounded"
+              disabled={debt.minimum_payment_cents <= 0}
+              onPress={() =>
+                updateSlot(0, {
+                  amount: formatDollarsInput(debt.minimum_payment_cents),
+                  date: formatLocalDate(new Date()),
+                })
+              }
+            />
+          </View>
+        ) : null}
+      </View>
+    </DialogScreen>
   );
 }

@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
-import { Colors } from '@/constants/theme';
+import { Colors, Layout } from '@/constants/theme';
 import { useBrandFonts } from '@/design-system/use-brand-fonts';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,8 +57,10 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'add-debt', title: 'Add debt' },
   { name: 'record-debt-payment', title: 'Record payment' },
   { name: 'plan-payment', title: 'Plan payment' },
+  { name: 'card-details', title: 'Card details' },
   { name: 'add-savings-goal', title: 'Add savings goal' },
   { name: 'add-goal-activity', title: 'Goal activity' },
+  { name: 'savings-challenge', title: '52-Week Money Challenge' },
   { name: 'scan-receipt', title: 'Scan receipt' },
   { name: 'review-receipt', title: 'Review receipt' },
   { name: 'scan-pantry', title: 'Scan pantry' },
@@ -79,6 +82,34 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
 ];
 
 /**
+ * Routes whose screen renders `<DialogScreen>` (components/ui/dialog). On web
+ * these use `transparentModal` so the previous page stays visible behind the
+ * dimmed backdrop, with no header on wide screens (the dialog draws its own
+ * title); on narrow web and native they keep the standard modal + header.
+ *
+ * Add a route name here only once its screen has been converted to
+ * `<DialogScreen>` — an unconverted screen would lose its header on wide web.
+ * Grocery / Reports / Budget Buddy / scan-* / review-* / report-* stay out.
+ */
+const DIALOG_SCREENS = new Set<string>([
+  'add-transaction',
+  'manage-categories',
+  'add-category',
+  'add-income',
+  'add-paycheck',
+  'assign-paycheck',
+  'add-bill',
+  'record-bill-payment',
+  'add-debt',
+  'record-debt-payment',
+  'plan-payment',
+  'card-details',
+  'add-savings-goal',
+  'add-goal-activity',
+  'savings-challenge',
+]);
+
+/**
  * Route protection: signed-in and guest users get the tab shell; everyone
  * else (including the brief moment before the initial session check
  * resolves) gets the auth flow. `Stack.Protected`'s `guard` decides which
@@ -86,6 +117,8 @@ const MODAL_SCREENS: { name: string; title: string }[] = [
  */
 function RootNavigator() {
   const { status } = useAuth();
+  const { width } = useWindowDimensions();
+  const isWideWeb = Platform.OS === 'web' && width >= Layout.sidebarBreakpoint;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -101,7 +134,16 @@ function RootNavigator() {
           <Stack.Screen
             key={screen.name}
             name={screen.name}
-            options={{ presentation: 'modal', headerShown: true, title: screen.title }}
+            options={
+              DIALOG_SCREENS.has(screen.name) && Platform.OS === 'web'
+                ? {
+                    presentation: 'transparentModal',
+                    animation: 'fade',
+                    headerShown: !isWideWeb,
+                    title: screen.title,
+                  }
+                : { presentation: 'modal', headerShown: true, title: screen.title }
+            }
           />
         ))}
       </Stack.Protected>

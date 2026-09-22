@@ -8,88 +8,80 @@ import { CardsTab } from '@/components/bills/cards-tab';
 import { exportCardsToCsv } from '@/components/bills/cards-csv';
 import { LoansTab } from '@/components/bills/loans-tab';
 import { PayoffTab } from '@/components/bills/payoff-tab';
-import { BillsSubTabs, type BillsSubTab } from '@/components/bills/sub-tabs';
 import { useBillsDebtData } from '@/components/bills/use-bills-debt-data';
 import type { BillItem, DebtItem } from '@/components/bills/view-models';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
-import { ScreenHeader } from '@/components/ui/screen-header';
+import { PageTabs } from '@/components/ui/segmented-control';
 import { Space } from '@/constants/theme';
+
+type BillsSubTab = 'bills' | 'cards' | 'loans' | 'payoff';
+
+const TABS: { value: BillsSubTab; label: string }[] = [
+  { value: 'bills', label: 'Bills' },
+  { value: 'cards', label: 'Credit Cards' },
+  { value: 'loans', label: 'Loans & Mortgages' },
+  { value: 'payoff', label: 'Payoff Plan' },
+];
 
 /**
  * Bills & Debt — four views (Bills, Credit Cards, Loans & Mortgages, Payoff
- * Plan) over real data for signed-in users and the shared demo data for
- * guests. Guests browse read-only: any action that would write sends them to
- * sign-up instead, same as the Dashboard's guest banner.
+ * Plan) over the user's data. Guests run exactly the same code against the
+ * in-memory sample database, so every control works for them too.
  */
 export default function BillsScreen() {
   const data = useBillsDebtData();
   const [tab, setTab] = useState<BillsSubTab>('bills');
 
-  /** Wraps a navigation so guests are invited to create an account rather than reaching a form that can't save. */
-  function guarded(go: () => void) {
-    return () => (data.isGuest ? router.push('/sign-up') : go());
-  }
-
-  const addAction: Record<BillsSubTab, { label: string; onPress: () => void }> = {
-    bills: { label: '+ Add bill', onPress: guarded(() => router.push('/add-bill')) },
-    cards: {
-      label: '+ Add credit card',
-      onPress: guarded(() => router.push({ pathname: '/add-debt', params: { kind: 'card' } })),
-    },
-    loans: {
-      label: '+ Add loan',
-      onPress: guarded(() => router.push({ pathname: '/add-debt', params: { kind: 'loan' } })),
-    },
-    payoff: {
-      label: '+ Add debt',
-      onPress: guarded(() => router.push('/add-debt')),
-    },
-  };
+  const addBill = () => router.push('/add-bill');
+  const addCard = () => router.push({ pathname: '/add-debt', params: { kind: 'card' } });
+  const addLoan = () => router.push({ pathname: '/add-debt', params: { kind: 'loan' } });
 
   const editDebt = (debt: DebtItem) =>
-    guarded(() => router.push({ pathname: '/add-debt', params: { debtId: debt.id } }))();
+    router.push({ pathname: '/add-debt', params: { debtId: debt.id } });
   const manageDebt = (debt: DebtItem) =>
-    guarded(() => router.push({ pathname: '/record-debt-payment', params: { debtId: debt.id } }))();
+    router.push({ pathname: '/record-debt-payment', params: { debtId: debt.id } });
   const planDebt = (debt: DebtItem) =>
-    guarded(() =>
-      router.push({ pathname: '/plan-payment', params: { kind: 'debt', id: debt.id } })
-    )();
-  const removeDebt = async (debt: DebtItem) => {
-    if (data.isGuest) {
-      router.push('/sign-up');
-      return;
-    }
-    await data.removeDebt(debt.id);
-  };
+    router.push({
+      pathname: '/plan-payment',
+      params: { targetType: 'debt', targetId: debt.id },
+    });
+  const cardDetails = (debt: DebtItem) =>
+    router.push({ pathname: '/card-details', params: { debtId: debt.id } });
 
   const logBill = (bill: BillItem) =>
-    guarded(() =>
-      router.push({
-        pathname: '/record-bill-payment',
-        params: { billId: bill.id, amountCents: String(bill.remainingCents) },
-      })
-    )();
+    router.push({
+      pathname: '/record-bill-payment',
+      params: {
+        billId: bill.id,
+        amountCents: String(bill.remainingCents > 0 ? bill.remainingCents : bill.amountCents),
+      },
+    });
   const planBill = (bill: BillItem) =>
-    guarded(() =>
-      router.push({ pathname: '/plan-payment', params: { kind: 'bill', id: bill.id } })
-    )();
+    router.push({
+      pathname: '/plan-payment',
+      params: { targetType: 'bill', targetId: bill.id },
+    });
 
   return (
     <Screen showGuestBanner>
-      <ScreenHeader
+      <PageHeader
         title="Bills & Debt"
         subtitle="Bills, cards, loans and your payoff plan."
-        action={
-          <Button
-            label={addAction[tab].label}
-            variant="secondary"
-            onPress={addAction[tab].onPress}
-          />
+        right={
+          tab === 'bills' ? (
+            <Button label="+ Add bill" size="sm" shape="rounded" onPress={addBill} />
+          ) : undefined
         }
       />
 
-      <BillsSubTabs value={tab} onChange={setTab} />
+      <PageTabs
+        accessibilityLabel="Bills and debt views"
+        options={TABS}
+        value={tab}
+        onChange={setTab}
+      />
 
       {data.errorMessage ? (
         <ThemedText themeColor="danger" accessibilityRole="alert">
@@ -103,12 +95,10 @@ export default function BillsScreen() {
             bills={data.bills}
             plans={data.plans}
             isLoading={data.isLoading}
-            onAddBill={addAction.bills.onPress}
+            onAddBill={addBill}
             onLogPayment={logBill}
             onPlanPayment={planBill}
-            onToggleReminder={(bill, enabled) =>
-              data.isGuest ? router.push('/sign-up') : data.setBillReminder(bill.id, enabled)
-            }
+            onToggleReminder={(bill, enabled) => data.setBillReminder(bill.id, enabled)}
           />
         ) : null}
         {tab === 'cards' ? (
@@ -117,11 +107,12 @@ export default function BillsScreen() {
             plans={data.plans}
             prefs={data.prefs}
             isLoading={data.isLoading}
-            onAddCard={addAction.cards.onPress}
+            onAddCard={addCard}
             onEditCard={editDebt}
+            onViewDetails={cardDetails}
             onManagePayments={manageDebt}
             onPlanPayment={planDebt}
-            onRemoveCard={removeDebt}
+            onRemoveCard={(card) => data.removeDebt(card.id)}
             onSavePrefs={data.savePrefs}
             onExportCsv={() => exportCardsToCsv(data.cards)}
           />
@@ -131,11 +122,11 @@ export default function BillsScreen() {
             loans={data.loans}
             plans={data.plans}
             isLoading={data.isLoading}
-            onAddLoan={addAction.loans.onPress}
+            onAddLoan={addLoan}
             onEditLoan={editDebt}
             onManagePayments={manageDebt}
             onPlanPayment={planDebt}
-            onRemoveLoan={removeDebt}
+            onRemoveLoan={(loan) => data.removeDebt(loan.id)}
           />
         ) : null}
         {tab === 'payoff' ? (

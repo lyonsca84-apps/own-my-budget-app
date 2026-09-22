@@ -12,8 +12,8 @@ import {
 import { formatCents } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { IconButton } from '@/components/ui/button';
 import { Radius, Space } from '@/constants/theme';
+import { Chevron } from '@/components/ui/chevron';
 import { useTheme } from '@/hooks/use-theme';
 import { CreditCardFace } from './credit-card-face';
 import { useReducedMotion } from './use-reduced-motion';
@@ -25,9 +25,9 @@ export interface CardCarouselProps {
   onSelect: (id: string) => void;
 }
 
-const MAX_CARD_WIDTH = 320;
+const MAX_CARD_WIDTH = 300;
 const MIN_CARD_WIDTH = 220;
-const GAP = Space[4];
+const GAP = 36;
 const IS_WEB = Platform.OS === 'web';
 
 /**
@@ -76,7 +76,11 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
   // Put the scroll position where the selection already is — on first
   // layout, when the card set changes (added/removed), or on resize.
   useEffect(() => {
-    if (width > 0 && cards.length > 0) scrollToIndex(selectedIndex, false);
+    if (width > 0 && cards.length > 0) {
+      scrollToIndex(selectedIndex, false);
+      // The browser re-snaps after a resize and fires scroll events against the new step; ignore that settling.
+      ignoreScrollUntil.current = Date.now() + 700;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, cards.length]);
 
@@ -109,7 +113,7 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
 
   if (cards.length === 0) return null;
 
-  const announce = `${selectedCard.label}, card ${selectedIndex + 1} of ${cards.length}`;
+  const announce = `${selectedCard.label}, Card ${selectedIndex + 1} of ${cards.length}`;
 
   return (
     <View
@@ -183,13 +187,12 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
             marginTop: Space[3],
           }}
         >
-          <IconButton
-            accessibilityLabel="Previous card"
+          <NavButton
+            label="Previous card"
             disabled={selectedIndex <= 0}
             onPress={() => goTo(selectedIndex - 1)}
-          >
-            <ThemedText type="smallBold">‹</ThemedText>
-          </IconButton>
+            direction="left"
+          />
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {cards.map((card, index) => {
               const selected = index === selectedIndex;
@@ -202,7 +205,7 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
                   onPress={() => goTo(index)}
                   style={{
                     minHeight: 44,
-                    minWidth: 28,
+                    minWidth: 20,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -210,7 +213,7 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
                   <View
                     style={{
                       height: 8,
-                      width: selected ? 22 : 8,
+                      width: selected ? 26 : 8,
                       borderRadius: Radius.full,
                       backgroundColor: selected ? theme.panel : theme.controlBorder,
                     }}
@@ -219,13 +222,12 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
               );
             })}
           </View>
-          <IconButton
-            accessibilityLabel="Next card"
+          <NavButton
+            label="Next card"
             disabled={selectedIndex >= cards.length - 1}
             onPress={() => goTo(selectedIndex + 1)}
-          >
-            <ThemedText type="smallBold">›</ThemedText>
-          </IconButton>
+            direction="right"
+          />
         </View>
       ) : null}
 
@@ -239,5 +241,48 @@ export function CardCarousel({ cards, selectedId, onSelect }: CardCarouselProps)
         {announce}
       </ThemedText>
     </View>
+  );
+}
+
+/** Round white prev/next control: 44px target around a 36px circle. */
+function NavButton({
+  label,
+  disabled,
+  onPress,
+  direction,
+}: {
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+  direction: 'left' | 'right';
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      aria-disabled={disabled}
+      disabled={disabled}
+      onPress={onPress}
+      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: Radius.full,
+          backgroundColor: theme.backgroundElement,
+          borderWidth: 1,
+          borderColor: theme.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: disabled ? 0.45 : 1,
+        }}
+      >
+        <View style={{ transform: [{ rotate: direction === 'left' ? '90deg' : '-90deg' }] }}>
+          <Chevron color={theme.text} />
+        </View>
+      </View>
+    </Pressable>
   );
 }

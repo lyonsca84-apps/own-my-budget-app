@@ -7,6 +7,7 @@ export * from './budgeting';
 export * from './dates';
 export * from './debt';
 export * from './savings';
+export * from './dashboard';
 export * from './featureGate';
 export * from './features/receiptScans';
 export * from './features/pantryScans';

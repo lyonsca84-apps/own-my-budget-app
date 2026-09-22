@@ -75,7 +75,11 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** Extra links shown only in the wide web sidebar, alongside the tab items above. */
+/**
+ * Extra links shown only in the wide web sidebar, alongside the tab items
+ * above. These are root-level screens, not tab routes; on wide web they're
+ * wrapped in `WideSidebarFrame` so the sidebar stays visible while open.
+ */
 export const WIDE_EXTRA_LINKS: { label: string; href: Href }[] = [
   { label: 'Grocery', href: '/grocery-list' },
   { label: 'Reports', href: '/reports' },

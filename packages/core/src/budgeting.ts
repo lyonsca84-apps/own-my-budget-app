@@ -344,3 +344,52 @@ export function summarizeBudget(rows: BudgetCategoryRow[]): BudgetSummary {
     percentUsed: plannedCents > 0 ? Math.round((actualCents / plannedCents) * 100) : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Budget view helpers (bar layout, income-source labels)
+// ---------------------------------------------------------------------------
+
+export interface BudgetBarPercents {
+  categoryId: string;
+  /** 0-100: how much of the shared track the planned amount fills. */
+  plannedPercent: number;
+  /** 0-100: how much of the shared track the actual amount fills. */
+  actualPercent: number;
+}
+
+/**
+ * Bar widths for the planned-vs-actual list. Every row is scaled against the
+ * largest planned OR actual figure so a planned bar and an actual bar can
+ * never run past the end of the track, and rows compare with each other.
+ */
+export function budgetBarPercents(rows: BudgetCategoryRow[]): BudgetBarPercents[] {
+  const scale = Math.max(1, ...rows.map((r) => Math.max(r.plannedCents, r.actualCents)));
+  const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+  return rows.map((r) => ({
+    categoryId: r.categoryId,
+    plannedPercent: clamp((r.plannedCents / scale) * 100),
+    actualPercent: clamp((r.actualCents / scale) * 100),
+  }));
+}
+
+const INCOME_LABEL_SEPARATOR = ' · ';
+
+/**
+ * Income sources store one `label`; the design shows it as "Person · Source"
+ * ("Jamie · Retail Job"). A label with no separator is all source.
+ */
+export function splitIncomeLabel(label: string): { person: string; source: string } {
+  const index = label.indexOf(INCOME_LABEL_SEPARATOR);
+  if (index === -1) return { person: '', source: label.trim() };
+  return {
+    person: label.slice(0, index).trim(),
+    source: label.slice(index + INCOME_LABEL_SEPARATOR.length).trim(),
+  };
+}
+
+/** Inverse of {@link splitIncomeLabel}; either half may be empty. */
+export function joinIncomeLabel(person: string, source: string): string {
+  const p = person.trim();
+  const s = source.trim();
+  return p && s ? `${p}${INCOME_LABEL_SEPARATOR}${s}` : p || s;
+}

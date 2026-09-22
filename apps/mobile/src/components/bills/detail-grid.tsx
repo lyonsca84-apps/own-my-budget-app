@@ -1,64 +1,80 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Card } from '@/components/ui/card';
-import { Radius, Space, type ThemeColor } from '@/constants/theme';
+import { Fonts, Radius, Space, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { ResponsiveGrid } from './common';
 
 export interface DetailItemProps {
   label: string;
-  /** null/empty renders an em dash (and an "Add" link when onAdd is given) rather than repeated prose. */
+  /** null/empty renders an "Add information" link when onAdd is given, otherwise an em dash. */
   value: string | null | undefined;
   onAdd?: () => void;
+  /** Adds a word next to the value (never color alone) — e.g. "watch" for high utilization. */
+  tone?: 'default' | 'watch';
 }
 
-export function DetailItem({ label, value, onAdd }: DetailItemProps) {
+export function DetailItem({ label, value, onAdd, tone = 'default' }: DetailItemProps) {
   const missing = value === null || value === undefined || value === '';
   return (
-    <View style={{ flexGrow: 1, flexBasis: 150, gap: 2 }}>
+    <View style={{ gap: 2, minWidth: 0 }}>
       <ThemedText type="small" themeColor="textSecondary">
         {label}
       </ThemedText>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[2], flexWrap: 'wrap' }}>
-        <ThemedText type="smallBold">{missing ? '—' : value}</ThemedText>
-        {missing && onAdd ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Add ${label.toLowerCase()}`}
-            onPress={onAdd}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <ThemedText type="smallBold" themeColor="primary">
-              Add
-            </ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
+      {missing && onAdd ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${label.toLowerCase()}`}
+          onPress={onAdd}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <ThemedText type="smallBold" themeColor="solidAccent">
+            Add information
+          </ThemedText>
+        </Pressable>
+      ) : (
+        <ThemedText type="smallBold" themeColor={tone === 'watch' ? 'warning' : 'text'}>
+          {missing ? '—' : value}
+        </ThemedText>
+      )}
     </View>
   );
 }
 
-/** A wrapping grid of label/value facts — used for a card's or loan's "more details". */
-export function DetailGrid({ children }: { children: ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[4] }}>{children}</View>;
+/** A wrapping grid of label/value facts — a card's or loan's details. */
+export function DetailGrid({
+  children,
+  maxColumns = 5,
+  minCell = 150,
+}: {
+  children: ReactNode;
+  maxColumns?: number;
+  minCell?: number;
+}) {
+  return (
+    <ResponsiveGrid minCell={minCell} maxColumns={maxColumns} gap={Space[4]} align="flex-start">
+      {Children.toArray(children)}
+    </ResponsiveGrid>
+  );
 }
 
-export type TileTone = 'panel' | 'primary' | 'success' | 'accent' | 'muted';
+/** The design's summary tiles: three solid (navy / blue / green), one soft teal, the rest plain. */
+export type TileTone = 'panel' | 'primary' | 'success' | 'accent' | 'plain';
 
-const TILE_COLORS: Record<TileTone, { bg: ThemeColor; fg: ThemeColor }> = {
+const TILE_COLORS: Record<TileTone, { bg: ThemeColor | null; fg: ThemeColor }> = {
   panel: { bg: 'panel', fg: 'onPanel' },
-  primary: { bg: 'primary', fg: 'onPrimary' },
-  success: { bg: 'successMuted', fg: 'success' },
+  primary: { bg: 'solidInfo', fg: 'onSolid' },
+  success: { bg: 'solidSuccess', fg: 'onSolid' },
   accent: { bg: 'accentMuted', fg: 'text' },
-  muted: { bg: 'backgroundElement', fg: 'text' },
+  plain: { bg: null, fg: 'text' },
 };
 
-/** The design's colored summary tile: small label over a Poppins figure. */
 export function SummaryTile({
   label,
   value,
-  tone = 'muted',
+  tone = 'plain',
 }: {
   label: string;
   value: string;
@@ -67,28 +83,41 @@ export function SummaryTile({
   const theme = useTheme();
   const colors = TILE_COLORS[tone];
   return (
-    <Card
+    <View
       accessible
       accessibilityLabel={`${label}: ${value}`}
       style={{
-        flexGrow: 1,
-        flexBasis: 160,
+        flex: 1,
         gap: Space[1],
         padding: Space[4],
         borderRadius: Radius.smallCard,
-        backgroundColor: theme[colors.bg],
+        backgroundColor: colors.bg ? theme[colors.bg] : 'transparent',
       }}
     >
-      <ThemedText type="smallBold" themeColor={colors.fg}>
+      <ThemedText type="small" themeColor={colors.fg} style={{ fontFamily: Fonts.body.medium }}>
         {label}
       </ThemedText>
-      <ThemedText type="amountSmall" themeColor={colors.fg}>
+      <ThemedText
+        themeColor={colors.fg}
+        style={{
+          fontFamily: Fonts.heading.bold,
+          fontSize: 24,
+          lineHeight: 30,
+          letterSpacing: -0.24,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
         {value}
       </ThemedText>
-    </Card>
+    </View>
   );
 }
 
+/** Up to five tiles a row on wide screens, two on a phone. */
 export function SummaryTiles({ children }: { children: ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>{children}</View>;
+  return (
+    <ResponsiveGrid minCell={170} maxColumns={5} gap={Space[3]}>
+      {Children.toArray(children)}
+    </ResponsiveGrid>
+  );
 }

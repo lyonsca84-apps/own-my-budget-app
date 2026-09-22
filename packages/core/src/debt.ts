@@ -187,6 +187,30 @@ export function calculatePayoffComparison(
   };
 }
 
+/**
+ * Whether an account counts as paid off. A zero balance only means "paid off"
+ * when there is evidence money was owed and repaid — a recorded starting
+ * balance or at least one payment. A loan added with no balance yet (the
+ * database stores 0 where the UI shows "—") is *unknown*, not cleared.
+ */
+export function isDebtPaidOff(debt: {
+  balanceCents: number;
+  originalBalanceCents: number | null;
+  totalPaidCents: number;
+}): boolean {
+  if (debt.balanceCents > 0) return false;
+  return (debt.originalBalanceCents ?? 0) > 0 || debt.totalPaidCents > 0;
+}
+
+/** True when a zero balance really is a known "nothing owed", false for the "no balance entered yet" placeholder. */
+export function isDebtBalanceKnown(debt: {
+  balanceCents: number;
+  originalBalanceCents: number | null;
+  totalPaidCents: number;
+}): boolean {
+  return debt.balanceCents > 0 || isDebtPaidOff(debt);
+}
+
 /** Percent (0-100) of a debt cleared since it started; null when there's no starting balance to measure against. */
 export function calculateDebtPaidPercent(
   startingBalanceCents: number | null,

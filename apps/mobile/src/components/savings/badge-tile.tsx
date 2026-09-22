@@ -5,7 +5,7 @@ import { BADGE_TIER_LABELS, type BadgeId } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { formatShortDate } from '@/components/savings/format';
+import { formatActivityDate } from '@/components/savings/format';
 import { useReducedMotion } from '@/components/savings/use-reduced-motion';
 import type { BadgeView } from '@/components/savings/use-savings-data';
 import { Layout, Radius, Space } from '@/constants/theme';
@@ -49,7 +49,7 @@ export function BadgeTile({ badge, expanded, onToggle }: BadgeTileProps) {
   const progressPercent = badge.progress ? (badge.progress.now / badge.progress.of) * 100 : 0;
   const stateLabel = badge.earned
     ? badge.earnedOn
-      ? `Earned ${formatShortDate(badge.earnedOn)}`
+      ? `Earned ${formatActivityDate(badge.earnedOn)}`
       : 'Earned'
     : showProgress
       ? `Not earned yet, ${badge.progress?.label}`

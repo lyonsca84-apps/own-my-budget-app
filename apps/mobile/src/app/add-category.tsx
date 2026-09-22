@@ -1,40 +1,42 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { createCategory, type Database } from '@own-my-budget/api';
+import { createCategory } from '@own-my-budget/api';
 
-import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Screen } from '@/components/ui/screen';
+import { closeDialogRoute, DialogScreen } from '@/components/ui/dialog';
+import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
+import { Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
 
-type CategoryType = Database['public']['Tables']['categories']['Row']['type'];
-const CATEGORY_TYPES: CategoryType[] = [
-  'bill',
-  'groceries',
-  'savings',
-  'debt',
-  'allowance',
-  'other',
+const CATEGORY_TYPES = [
+  { value: 'bill', label: 'Bill' },
+  { value: 'groceries', label: 'Groceries' },
+  { value: 'savings', label: 'Savings' },
+  { value: 'debt', label: 'Debt' },
+  { value: 'allowance', label: 'Allowance' },
+  { value: 'other', label: 'Other' },
 ];
 
+/** Adds a budget category. It shows up right away in the Budget tab's Planned vs actual list. */
 export default function AddCategoryScreen() {
-  const { user } = useAuth();
+  const { userId, isReady } = useDataUser();
   const [name, setName] = useState('');
-  const [type, setType] = useState<CategoryType>('other');
+  const [type, setType] = useState('other');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSave() {
-    if (!user) return;
+    if (!isReady || !userId) return;
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      await createCategory(supabase, { user_id: user.id, name: name.trim(), type });
-      router.back();
+      await createCategory(supabase, {
+        user_id: userId,
+        name: name.trim(),
+        type,
+      });
+      closeDialogRoute();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
@@ -43,35 +45,19 @@ export default function AddCategoryScreen() {
   }
 
   return (
-    <Screen>
-      <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Groceries" />
-
-      <View style={{ gap: Spacing.one }}>
-        <ThemedText type="smallBold">Type</ThemedText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-          {CATEGORY_TYPES.map((option) => (
-            <Button
-              key={option}
-              label={option}
-              variant={option === type ? 'primary' : 'secondary'}
-              onPress={() => setType(option)}
-            />
-          ))}
-        </View>
+    <DialogScreen
+      title="Add category"
+      subtitle="A place to plan and track spending, like Groceries or Rent."
+      primaryLabel="Save category"
+      onPrimary={handleSave}
+      primaryDisabled={!name.trim()}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+    >
+      <View style={{ gap: Space[4] }}>
+        <TextField label="Name" placeholder="e.g. Groceries" value={name} onChangeText={setName} />
+        <SelectField label="Type" value={type} onChange={setType} options={CATEGORY_TYPES} />
       </View>
-
-      {errorMessage ? (
-        <ThemedText type="small" themeColor="danger">
-          {errorMessage}
-        </ThemedText>
-      ) : null}
-
-      <Button
-        variant="panel"
-        label={isSubmitting ? 'Saving…' : 'Save category'}
-        onPress={handleSave}
-        disabled={isSubmitting || !name.trim()}
-      />
-    </Screen>
+    </DialogScreen>
   );
 }

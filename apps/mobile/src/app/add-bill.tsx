@@ -2,47 +2,63 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { createBill, type Database } from '@own-my-budget/api';
+import { formatLocalDate } from '@own-my-budget/core';
 
-import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Screen } from '@/components/ui/screen';
+import { parseDollarsToCents } from '@/components/bills/common';
+import { CheckboxField } from '@/components/ui/checkbox-field';
+import { DateField, isValidIsoDate } from '@/components/ui/date-field';
+import { DialogScreen } from '@/components/ui/dialog';
+import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
+import { Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
 
 type Recurrence = Database['public']['Tables']['bills']['Row']['recurrence'];
-const RECURRENCES: Recurrence[] = ['none', 'weekly', 'biweekly', 'monthly', 'yearly'];
+const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: 'monthly', label: 'Every month' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'weekly', label: 'Every week' },
+  { value: 'yearly', label: 'Every year' },
+  { value: 'none', label: 'Does not repeat' },
+];
 
+/** Add a bill — a centered dialog over Bills & Debt. */
 export default function AddBillScreen() {
-  const { user } = useAuth();
+  const { userId } = useDataUser();
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(formatLocalDate(new Date()));
   const [recurrence, setRecurrence] = useState<Recurrence>('monthly');
+  const [remind, setRemind] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSave() {
-    if (!user) return;
-    const amountCents = Math.round(parseFloat(amount) * 100);
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    if (!userId) return;
+    const amountCents = parseDollarsToCents(amount);
+    if (!label.trim()) {
+      setErrorMessage('Give this bill a name.');
+      return;
+    }
+    if (amountCents === null || amountCents <= 0) {
       setErrorMessage('Enter a valid amount.');
       return;
     }
-    if (!dueDate.trim()) {
-      setErrorMessage('Enter a due date.');
+    if (!isValidIsoDate(dueDate)) {
+      setErrorMessage('Choose a due date.');
       return;
     }
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await createBill(supabase, {
-        user_id: user.id,
+        user_id: userId,
         label: label.trim(),
         amount_cents: amountCents,
-        due_date: dueDate.trim(),
+        due_date: dueDate,
         recurrence,
+        reminder_enabled: remind,
       });
       router.back();
     } catch (error) {
@@ -53,48 +69,44 @@ export default function AddBillScreen() {
   }
 
   return (
-    <Screen>
-      <TextField label="Name" value={label} onChangeText={setLabel} placeholder="e.g. Electric" />
-      <TextField
-        label="Amount"
-        value={amount}
-        onChangeText={setAmount}
-        placeholder="0.00"
-        keyboardType="decimal-pad"
-      />
-      <TextField
-        label="Due date"
-        value={dueDate}
-        onChangeText={setDueDate}
-        placeholder="YYYY-MM-DD"
-      />
-
-      <View style={{ gap: Spacing.one }}>
-        <ThemedText type="smallBold">Repeats</ThemedText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-          {RECURRENCES.map((option) => (
-            <Button
-              key={option}
-              label={option}
-              variant={option === recurrence ? 'primary' : 'secondary'}
-              onPress={() => setRecurrence(option)}
+    <DialogScreen
+      title="Add bill"
+      subtitle="Track what is due and what you have paid."
+      primaryLabel="Add bill"
+      onPrimary={handleSave}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+    >
+      <View style={{ gap: Space[3] }}>
+        <TextField
+          label="Name"
+          value={label}
+          onChangeText={setLabel}
+          placeholder="e.g. Electric"
+          autoFocus
+        />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
+          <View style={{ flexGrow: 1, flexBasis: 200 }}>
+            <TextField
+              label="Amount"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
             />
-          ))}
+          </View>
+          <View style={{ flexGrow: 1, flexBasis: 200 }}>
+            <DateField label="Due date" value={dueDate} onChange={setDueDate} />
+          </View>
         </View>
+        <SelectField
+          label="Repeats"
+          value={recurrence}
+          onChange={(value) => setRecurrence(value as Recurrence)}
+          options={RECURRENCE_OPTIONS}
+        />
+        <CheckboxField label="Remind me before it is due" checked={remind} onChange={setRemind} />
       </View>
-
-      {errorMessage ? (
-        <ThemedText type="small" themeColor="danger">
-          {errorMessage}
-        </ThemedText>
-      ) : null}
-
-      <Button
-        variant="panel"
-        label={isSubmitting ? 'Saving…' : 'Save bill'}
-        onPress={handleSave}
-        disabled={isSubmitting || !label.trim() || !amount.trim() || !dueDate.trim()}
-      />
-    </Screen>
+    </DialogScreen>
   );
 }

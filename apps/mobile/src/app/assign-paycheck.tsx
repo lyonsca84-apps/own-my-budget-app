@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import {
@@ -11,13 +11,14 @@ import {
 } from '@own-my-budget/api';
 import { assignPaycheck, formatCents, formatLocalDate, parseLocalDate } from '@own-my-budget/core';
 
+import { parseDollarsToCents } from '@/components/budget/amount-input';
+import { formatPayday } from '@/components/budget/format';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
-import { Screen } from '@/components/ui/screen';
+import { closeDialogRoute, DialogScreen } from '@/components/ui/dialog';
 import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
+import { Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
 
 /**
  * First and last day of the calendar month containing `date`, as YYYY-MM-DD.
@@ -31,8 +32,9 @@ function currentMonthBounds(date: Date): { start: string; end: string } {
   return { start: formatLocalDate(start), end: formatLocalDate(end) };
 }
 
+/** Splits a logged paycheck across categories; each amount becomes that category's planned amount for the paycheck's month. */
 export default function AssignPaycheckScreen() {
-  const { user } = useAuth();
+  const { userId, isReady } = useDataUser();
   const { paycheckId } = useLocalSearchParams<{ paycheckId: string }>();
   const [paycheck, setPaycheck] = useState<Tables<'paychecks'> | null>(null);
   const [categories, setCategories] = useState<Tables<'categories'>[]>([]);
@@ -41,31 +43,30 @@ export default function AssignPaycheckScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !paycheckId) return;
-    Promise.all([getPaycheck(supabase, paycheckId), listCategories(supabase, user.id)]).then(
-      ([p, c]) => {
+    if (!isReady || !userId || !paycheckId) return;
+    let isMounted = true;
+    Promise.all([getPaycheck(supabase, paycheckId), listCategories(supabase, userId)])
+      .then(([p, c]) => {
+        if (!isMounted) return;
         setPaycheck(p);
         setCategories(c);
-      }
-    );
-  }, [user, paycheckId]);
-
-  if (!paycheck) {
-    return (
-      <Screen scroll={false} center>
-        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-      </Screen>
-    );
-  }
+      })
+      .catch((error) => {
+        if (isMounted) setErrorMessage(error instanceof Error ? error.message : 'Could not load.');
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [isReady, userId, paycheckId]);
 
   const allocations = categories.map((c) => ({
     categoryId: c.id,
-    amountCents: Math.round((parseFloat(amounts[c.id] ?? '0') || 0) * 100),
+    amountCents: parseDollarsToCents(amounts[c.id] ?? '') ?? 0,
   }));
-  const result = assignPaycheck(paycheck.amount_cents, allocations);
+  const result = assignPaycheck(paycheck?.amount_cents ?? 0, allocations);
 
   async function handleSave() {
-    if (!user || !paycheck) return;
+    if (!isReady || !userId || !paycheck) return;
     if (result.isOverAllocated) {
       setErrorMessage("You've allocated more than this paycheck — adjust an amount.");
       return;
@@ -74,13 +75,13 @@ export default function AssignPaycheckScreen() {
     setIsSubmitting(true);
     try {
       const { start, end } = currentMonthBounds(parseLocalDate(paycheck.pay_date));
-      const period = await getOrCreateBudgetPeriod(supabase, user.id, start, end);
+      const period = await getOrCreateBudgetPeriod(supabase, userId, start, end);
       await Promise.all(
         allocations
           .filter((a) => a.amountCents > 0)
           .map((a) =>
             upsertBudgetLine(supabase, {
-              user_id: user.id,
+              user_id: userId,
               budget_period_id: period.id,
               category_id: a.categoryId,
               planned_cents: a.amountCents,
@@ -88,7 +89,7 @@ export default function AssignPaycheckScreen() {
           )
       );
       await markPaycheckAssigned(supabase, paycheck.id);
-      router.back();
+      closeDialogRoute();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
@@ -97,17 +98,27 @@ export default function AssignPaycheckScreen() {
   }
 
   return (
-    <Screen>
-      <ThemedText themeColor="textSecondary">
-        {formatCents(paycheck.amount_cents)} received {paycheck.pay_date}
-      </ThemedText>
-
-      {categories.length === 0 ? (
+    <DialogScreen
+      title="Assign paycheck"
+      subtitle={
+        paycheck
+          ? `${formatCents(paycheck.amount_cents)} received ${formatPayday(paycheck.pay_date)}`
+          : undefined
+      }
+      primaryLabel="Save assignment"
+      onPrimary={handleSave}
+      primaryDisabled={!paycheck || categories.length === 0 || result.isOverAllocated}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+    >
+      {!paycheck ? (
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      ) : categories.length === 0 ? (
         <ThemedText themeColor="textSecondary">
           Add a category first (from the Budget tab) before assigning a paycheck.
         </ThemedText>
       ) : (
-        <View style={{ gap: Spacing.three }}>
+        <View style={{ gap: Space[4] }}>
           {categories.map((category) => (
             <TextField
               key={category.id}
@@ -118,32 +129,18 @@ export default function AssignPaycheckScreen() {
               keyboardType="decimal-pad"
             />
           ))}
+          <View style={{ gap: Space[1] }}>
+            <ThemedText
+              type="smallBold"
+              themeColor={result.isOverAllocated ? 'warning' : undefined}
+            >
+              {result.isOverAllocated
+                ? `Over by ${formatCents(-result.remainingCents)} — you've allocated more than this paycheck.`
+                : `Remaining to assign: ${formatCents(result.remainingCents)}`}
+            </ThemedText>
+          </View>
         </View>
       )}
-
-      <View style={{ gap: Spacing.one }}>
-        <ThemedText type="smallBold">
-          Remaining to assign: {formatCents(result.remainingCents)}
-        </ThemedText>
-        {result.isOverAllocated && (
-          <ThemedText type="small" themeColor="warning">
-            You&apos;ve allocated more than this paycheck.
-          </ThemedText>
-        )}
-      </View>
-
-      {errorMessage ? (
-        <ThemedText type="small" themeColor="danger">
-          {errorMessage}
-        </ThemedText>
-      ) : null}
-
-      <Button
-        variant="panel"
-        label={isSubmitting ? 'Saving…' : 'Save assignment'}
-        onPress={handleSave}
-        disabled={isSubmitting || categories.length === 0 || result.isOverAllocated}
-      />
-    </Screen>
+    </DialogScreen>
   );
 }

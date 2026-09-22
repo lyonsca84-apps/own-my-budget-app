@@ -1,23 +1,22 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
+import { formatCentsCompact } from '@own-my-budget/core';
 
+import { BudgetCard } from '@/components/budget/budget-card';
 import { BudgetCategoryRowView } from '@/components/budget/budget-category-row';
 import { formatPayday } from '@/components/budget/format';
-import { MonthYearPicker } from '@/components/budget/month-year-picker';
 import { PaydayCard } from '@/components/budget/payday-card';
 import { PaySchedulesCard } from '@/components/budget/pay-schedules-card';
-import { useBudgetData } from '@/components/budget/use-budget-data';
+import { MONTH_NAMES, useBudgetData } from '@/components/budget/use-budget-data';
 import { ThemedText } from '@/components/themed-text';
 import { BillRow } from '@/components/ui/bill-row';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Grid } from '@/components/ui/grid';
+import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
-import { ScreenHeader } from '@/components/ui/screen-header';
-import { SectionCard } from '@/components/ui/section-card';
-import { SegmentedControl } from '@/components/ui/segmented-control';
-import { StatTile } from '@/components/ui/stat-tile';
+import { PageTabs } from '@/components/ui/segmented-control';
+import { SelectField } from '@/components/ui/select-field';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,33 +28,60 @@ const MODE_OPTIONS: { value: BudgetMode; label: string }[] = [
   { value: 'paycheck', label: 'Paycheck budget' },
 ];
 
+const MONTH_OPTIONS = MONTH_NAMES.map((name, index) => ({ value: String(index), label: name }));
+
 export default function BudgetScreen() {
   const theme = useTheme();
   const data = useBudgetData();
   const [mode, setMode] = useState<BudgetMode>('monthly');
-  const editable = !data.isGuest;
-  const { summary } = data;
-  const isOver = summary.remainingCents < 0;
+
+  const yearOptions = useMemo(() => {
+    const current = new Date().getFullYear();
+    const first = Math.min(current - 3, data.year);
+    const last = Math.max(current + 3, data.year);
+    return Array.from({ length: last - first + 1 }, (_, i) => {
+      const value = String(first + i);
+      return { value, label: value };
+    });
+  }, [data.year]);
 
   return (
     <Screen showGuestBanner>
-      <ScreenHeader
-        eyebrow="Budget"
+      <PageHeader
         title="Budget"
-        subtitle="Plan what's coming in and see where it goes."
+        subtitle="Plan by month or by paycheck."
+        right={
+          <>
+            <View style={{ width: 120 }}>
+              <SelectField
+                label="Year"
+                hideLabel
+                compact
+                value={String(data.year)}
+                options={yearOptions}
+                onChange={(year) => data.setPeriod(data.month, Number(year))}
+              />
+            </View>
+            <View style={{ width: 160 }}>
+              <SelectField
+                label="Month"
+                hideLabel
+                compact
+                value={String(data.month)}
+                options={MONTH_OPTIONS}
+                onChange={(month) => data.setPeriod(Number(month), data.year)}
+              />
+            </View>
+          </>
+        }
       />
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[4] }}>
-        <SegmentedControl options={MODE_OPTIONS} value={mode} onChange={setMode} />
-        {mode === 'monthly' ? (
-          <MonthYearPicker
-            month={data.month}
-            year={data.year}
-            onChange={data.setPeriod}
-            disabled={data.isGuest}
-          />
-        ) : null}
-      </View>
+      <PageTabs
+        options={MODE_OPTIONS}
+        value={mode}
+        onChange={setMode}
+        accessibilityLabel="Budget view"
+      />
 
       {data.errorMessage ? (
         <View
@@ -87,10 +113,17 @@ export default function BudgetScreen() {
             paydays, fill in from there.
           </ThemedText>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-            <Button label="Add income" variant="panel" onPress={() => router.push('/add-income')} />
+            <Button
+              label="Add income"
+              size="sm"
+              shape="rounded"
+              onPress={() => router.push('/add-income')}
+            />
             <Button
               label="Add a category"
-              variant="secondary"
+              variant="soft"
+              size="sm"
+              shape="rounded"
               onPress={() => router.push('/add-category')}
             />
           </View>
@@ -98,121 +131,63 @@ export default function BudgetScreen() {
       ) : null}
 
       {mode === 'monthly' ? (
-        <>
-          <Grid>
-            <StatTile
-              label="Planned"
-              valueCents={summary.plannedCents}
-              glyph="◎"
-              glyphColor="primary"
-              glyphTint="primaryMuted"
-              description={`Total planned for ${data.periodLabel}.`}
-            />
-            <StatTile
-              label="Spent so far"
-              valueCents={summary.actualCents}
-              glyph="≡"
-              glyphColor="textSecondary"
-              glyphTint="backgroundSelected"
-              description={
-                summary.percentUsed !== null
-                  ? `${summary.percentUsed}% of your plan.`
-                  : 'Set planned amounts to see how far along you are.'
-              }
-            />
-            <StatTile
-              label={isOver ? 'Over plan' : 'Left in plan'}
-              valueCents={Math.abs(summary.remainingCents)}
-              glyph="●"
-              glyphColor={isOver ? 'warning' : 'accent'}
-              glyphTint={isOver ? 'warningMuted' : 'accentMuted'}
-              trend={
-                isOver
-                  ? {
-                      label: `Watch ${summary.overCategoryCount} ${
-                        summary.overCategoryCount === 1 ? 'category' : 'categories'
-                      }`,
-                      tone: 'watch',
-                    }
-                  : undefined
-              }
-              description={
-                isOver
-                  ? 'Spending is past what you planned — a good moment to adjust.'
-                  : 'Planned minus spent, across every category.'
-              }
-              emphasize
-            />
-          </Grid>
-
-          <SectionCard
-            title={`Planned vs actual — ${data.periodLabel}`}
-            action={
-              editable ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
-                  <Button
-                    label="Manage"
-                    variant="quiet"
-                    accessibilityLabel="Manage categories"
-                    onPress={() => router.push('/manage-categories')}
-                  />
-                  <Button
-                    label="+ Add category"
-                    variant="secondary"
-                    onPress={() => router.push('/add-category')}
-                  />
-                </View>
-              ) : undefined
-            }
-          >
-            {editable ? (
+        <BudgetCard
+          title={`Planned vs actual — ${data.periodLabel}`}
+          action={
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+              <Button
+                label="Manage"
+                variant="soft"
+                size="sm"
+                shape="rounded"
+                accessibilityLabel="Manage categories"
+                onPress={() => router.push('/manage-categories')}
+              />
+              <Button
+                label="+ Add category"
+                size="sm"
+                shape="rounded"
+                onPress={() => router.push('/add-category')}
+              />
+            </View>
+          }
+        >
+          {data.rows.length === 0 ? (
+            <ThemedText themeColor="textSecondary">
+              {data.isLoading
+                ? 'Loading your categories…'
+                : 'No categories yet. Add one (like Groceries or Rent) to start planning this month.'}
+            </ThemedText>
+          ) : (
+            <View style={{ gap: Space[5] }}>
+              {data.rows.map((row, index) => (
+                <BudgetCategoryRowView
+                  key={row.categoryId}
+                  row={row}
+                  bar={data.bars[index]}
+                  periodLabel={data.periodLabel}
+                  onPlannedCommit={(cents) => data.savePlanned(row.categoryId, cents ?? 0)}
+                  onActualCommit={(cents) => data.saveActual(row.categoryId, cents)}
+                  onResetActual={() => data.saveActual(row.categoryId, null)}
+                />
+              ))}
               <ThemedText type="small" themeColor="textSecondary">
-                Edit spent or planned amounts for {data.periodLabel} — changes save when you leave
-                the field.
+                Total planned {formatCentsCompact(data.summary.plannedCents)} · spent{' '}
+                {formatCentsCompact(data.summary.actualCents)}
+                {data.summary.remainingCents < 0
+                  ? ` · ${formatCentsCompact(-data.summary.remainingCents)} over plan`
+                  : ` · ${formatCentsCompact(data.summary.remainingCents)} left in plan`}
+                . Changes save when you leave a field.
               </ThemedText>
-            ) : null}
-
-            {data.rows.length === 0 ? (
-              <ThemedText themeColor="textSecondary">
-                {data.isLoading
-                  ? 'Loading your categories…'
-                  : 'No categories yet. Add one (like Groceries or Rent) to start planning this month.'}
-              </ThemedText>
-            ) : (
-              <View>
-                {data.rows.map((row, index) => (
-                  <View
-                    key={row.categoryId}
-                    style={{
-                      paddingTop: index === 0 ? 0 : Space[5],
-                      borderTopWidth: index === 0 ? 0 : 1,
-                      borderTopColor: theme.border,
-                    }}
-                  >
-                    <BudgetCategoryRowView
-                      row={row}
-                      periodLabel={data.periodLabel}
-                      editable={editable}
-                      onPlannedCommit={(cents) => data.savePlanned(row.categoryId, cents ?? 0)}
-                      onActualCommit={(cents) => data.saveActual(row.categoryId, cents)}
-                      onResetActual={() => data.saveActual(row.categoryId, null)}
-                    />
-                  </View>
-                ))}
-              </View>
-            )}
-          </SectionCard>
-        </>
+            </View>
+          )}
+        </BudgetCard>
       ) : (
         <>
-          <PaySchedulesCard
-            schedules={data.schedules}
-            editable={editable}
-            isLoading={data.isLoading}
-          />
+          <PaySchedulesCard schedules={data.schedules} isLoading={data.isLoading} />
 
-          <SectionCard title="Payday view">
-            <ThemedText type="small" themeColor="textSecondary">
+          <BudgetCard title="Payday view">
+            <ThemedText type="small" themeColor="textSecondary" style={{ marginTop: -Space[2] }}>
               Plan which paycheck covers each bill, card, or loan payment. Planning does not change
               any balance — only marking a payment paid does.
             </ThemedText>
@@ -228,76 +203,76 @@ export default function BudgetScreen() {
                   : 'No upcoming paydays yet. Add a pay schedule with its next pay date and your paydays will show up here.'}
               </ThemedText>
             ) : (
-              <Grid>
+              <View style={{ gap: Space[4] }}>
                 {data.paydays.map((payday) => (
-                  <View key={payday.key} style={{ flexGrow: 1, flexBasis: 340 }}>
-                    <PaydayCard
-                      payday={payday}
-                      targets={data.targets}
-                      editable={editable && data.paydayPlanningAvailable}
-                      onAssign={(target, cents) =>
-                        data.assignPayment(
-                          { incomeSourceId: payday.incomeSourceId, payDate: payday.payDate },
-                          target,
-                          cents
-                        )
-                      }
-                      onRemove={data.removeAssignment}
-                    />
-                  </View>
+                  <PaydayCard
+                    key={payday.key}
+                    payday={payday}
+                    targets={data.targets}
+                    onAssign={(target, cents) =>
+                      data.assignPayment(
+                        { incomeSourceId: payday.incomeSourceId, payDate: payday.payDate },
+                        target,
+                        cents
+                      )
+                    }
+                    onRemove={data.removeAssignment}
+                  />
                 ))}
-              </Grid>
+              </View>
             )}
-          </SectionCard>
+          </BudgetCard>
 
-          {editable ? (
-            <SectionCard
-              title="Logged paychecks"
-              action={
-                <Button
-                  label="+ Log a paycheck"
-                  variant="secondary"
-                  onPress={() => router.push('/add-paycheck')}
-                />
-              }
-            >
-              {data.paychecks.length === 0 ? (
-                <ThemedText themeColor="textSecondary">
-                  {data.isLoading
-                    ? 'Loading your paychecks…'
-                    : 'No paychecks logged yet. Log one when it lands to split it across your categories.'}
-                </ThemedText>
-              ) : (
-                <View style={{ gap: Space[4] }}>
-                  {data.paychecks.slice(0, 5).map((paycheck) => (
-                    <BillRow
-                      key={paycheck.id}
-                      label="Paycheck"
-                      caption={`Received ${formatPayday(paycheck.pay_date)}`}
-                      amountCents={paycheck.amount_cents}
-                      trailing={
-                        paycheck.is_assigned ? (
-                          <StatusPill label="Assigned" tone="success" />
-                        ) : (
-                          <Button
-                            label="Assign"
-                            variant="secondary"
-                            accessibilityLabel={`Assign the paycheck received ${formatPayday(paycheck.pay_date)} to categories`}
-                            onPress={() =>
-                              router.push({
-                                pathname: '/assign-paycheck',
-                                params: { paycheckId: paycheck.id },
-                              })
-                            }
-                          />
-                        )
-                      }
-                    />
-                  ))}
-                </View>
-              )}
-            </SectionCard>
-          ) : null}
+          <BudgetCard
+            title="Logged paychecks"
+            action={
+              <Button
+                label="+ Log a paycheck"
+                variant="soft"
+                size="sm"
+                shape="rounded"
+                onPress={() => router.push('/add-paycheck')}
+              />
+            }
+          >
+            {data.paychecks.length === 0 ? (
+              <ThemedText themeColor="textSecondary">
+                {data.isLoading
+                  ? 'Loading your paychecks…'
+                  : 'No paychecks logged yet. Log one when it lands to split it across your categories.'}
+              </ThemedText>
+            ) : (
+              <View style={{ gap: Space[4] }}>
+                {data.paychecks.slice(0, 5).map((paycheck) => (
+                  <BillRow
+                    key={paycheck.id}
+                    label="Paycheck"
+                    caption={`Received ${formatPayday(paycheck.pay_date)}`}
+                    amountCents={paycheck.amount_cents}
+                    trailing={
+                      paycheck.is_assigned ? (
+                        <StatusPill label="Assigned" tone="success" />
+                      ) : (
+                        <Button
+                          label="Assign"
+                          variant="soft"
+                          size="sm"
+                          shape="rounded"
+                          accessibilityLabel={`Assign the paycheck received ${formatPayday(paycheck.pay_date)} to categories`}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/assign-paycheck',
+                              params: { paycheckId: paycheck.id },
+                            })
+                          }
+                        />
+                      )
+                    }
+                  />
+                ))}
+              </View>
+            )}
+          </BudgetCard>
         </>
       )}
     </Screen>

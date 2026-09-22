@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { Pressable, useColorScheme, View } from 'react-native';
+import { View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
+import { BudgetBuddyFab } from '@/components/helper/budget-buddy-fab';
 import { NAV_ITEMS } from '@/constants/nav';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : (scheme ?? 'light')];
+  const colors = Colors[scheme];
 
   return (
     <View style={{ flex: 1 }}>
@@ -28,30 +29,8 @@ export default function AppTabs() {
       </NativeTabs>
 
       {/* Persistent AI Helper access, matching the approved design — not a
-          standard tab on any platform. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open Budget Buddy, your AI assistant"
-        onPress={() => router.push('/helper')}
-        style={{
-          position: 'absolute',
-          right: Spacing.four,
-          bottom: 90,
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: colors.budgetBuddy,
-          alignItems: 'center',
-          justifyContent: 'center',
-          shadowColor: '#000',
-          shadowOpacity: 0.2,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 6,
-        }}
-      >
-        <ThemedText style={{ color: colors.onPrimary, fontSize: 22 }}>✦</ThemedText>
-      </Pressable>
+          standard tab on any platform. Sits above the native tab bar. */}
+      <BudgetBuddyFab bottom={90} onPress={() => router.push('/helper')} />
     </View>
   );
 }
