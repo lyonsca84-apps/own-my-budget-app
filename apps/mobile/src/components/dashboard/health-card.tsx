@@ -3,9 +3,8 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
-import { Caption, CardTitle, DashCard } from '@/components/dashboard/common';
+import { Caption, DashCard } from '@/components/dashboard/common';
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
 import { Brand, Fonts, Radius, Space, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,22 +24,22 @@ function pointOnArc(cx: number, cy: number, r: number, angleDeg: number) {
 
 function Gauge({ score, label }: { score: number; label: string }) {
   const theme = useTheme();
-  const width = 240;
-  const height = 132;
-  const stroke = 26;
+  const width = 380;
+  const height = 200;
+  const stroke = 40;
   const cx = width / 2;
-  const cy = 118;
-  const r = 100;
+  const cy = 180;
+  const r = 150;
   const start = pointOnArc(cx, cy, r, 180);
   const end = pointOnArc(cx, cy, r, 0);
-  const tip = pointOnArc(cx, cy, r - stroke / 2 - 4, 180 - (score / 100) * 180);
+  const tip = pointOnArc(cx, cy, r - stroke / 2 - 6, 180 - (score / 100) * 180);
 
   return (
     <View
       accessible
       accessibilityRole="image"
       accessibilityLabel={`Budget health score ${score} out of 100, ${label}`}
-      style={{ width, height }}
+      style={{ width, height, maxWidth: '100%' }}
     >
       <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <Defs>
@@ -57,14 +56,15 @@ function Gauge({ score, label }: { score: number; label: string }) {
           fill="none"
           stroke="url(#dash-health-gauge)"
           strokeWidth={stroke}
+          strokeLinecap="round"
         />
         <Path
           d={`M ${cx} ${cy} L ${tip.x} ${tip.y}`}
           stroke={theme.text}
-          strokeWidth={4}
+          strokeWidth={6}
           strokeLinecap="round"
         />
-        <Circle cx={cx} cy={cy} r={6} fill={theme.text} />
+        <Circle cx={cx} cy={cy} r={9} fill={theme.text} />
       </Svg>
     </View>
   );
@@ -85,9 +85,14 @@ export function HealthCard({ health, change, improveTips }: HealthCardProps) {
     change.tone === 'good' ? 'success' : change.tone === 'watch' ? 'warning' : 'textSecondary';
 
   return (
-    <DashCard style={{ gap: Space[3] }}>
+    <DashCard style={{ gap: Space[5] }} padding={Space[7]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <CardTitle>Budget Health Score</CardTitle>
+        <ThemedText
+          accessibilityRole="header"
+          style={{ fontFamily: Fonts.heading.bold, fontSize: 26, lineHeight: 32 }}
+        >
+          Budget Health Score
+        </ThemedText>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="How this score is calculated"
@@ -95,9 +100,9 @@ export function HealthCard({ health, change, improveTips }: HealthCardProps) {
           onPress={() => setInfoOpen((open) => !open)}
           hitSlop={8}
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
             borderWidth: 1.5,
             borderColor: theme.controlBorder,
             backgroundColor: infoOpen ? theme.backgroundSelected : theme.backgroundElement,
@@ -105,20 +110,20 @@ export function HealthCard({ health, change, improveTips }: HealthCardProps) {
             justifyContent: 'center',
           }}
         >
-          <ThemedText style={{ fontFamily: Fonts.body.bold, fontSize: 14, lineHeight: 18 }}>
+          <ThemedText style={{ fontFamily: Fonts.body.bold, fontSize: 16, lineHeight: 20 }}>
             i
           </ThemedText>
         </Pressable>
       </View>
 
-      <View style={{ alignItems: 'center', gap: 2 }}>
+      <View style={{ alignItems: 'center', gap: 4 }}>
         <Gauge score={health.score} label={health.label} />
         <ThemedText
           style={{
             fontFamily: Fonts.heading.bold,
-            fontSize: 40,
-            lineHeight: 46,
-            marginTop: -6,
+            fontSize: 68,
+            lineHeight: 76,
+            marginTop: -10,
             fontVariant: ['tabular-nums'],
           }}
           accessibilityElementsHidden
@@ -127,12 +132,18 @@ export function HealthCard({ health, change, improveTips }: HealthCardProps) {
         </ThemedText>
         <ThemedText
           themeColor={BAND_COLOR[health.band]}
-          style={{ fontFamily: Fonts.body.bold, fontSize: 15, lineHeight: 22 }}
+          style={{ fontFamily: Fonts.body.bold, fontSize: 22, lineHeight: 28, marginTop: 2 }}
         >
           {health.label}
         </ThemedText>
-        <Caption style={{ textAlign: 'center', marginTop: 4 }}>{health.note}</Caption>
-        <Caption bold color={changeColor} style={{ textAlign: 'center' }}>
+        <Caption style={{ fontSize: 17, lineHeight: 24, textAlign: 'center', marginTop: 8 }}>
+          {health.note}
+        </Caption>
+        <Caption
+          bold
+          color={changeColor}
+          style={{ fontSize: 17, lineHeight: 24, textAlign: 'center' }}
+        >
           {change.text}
         </Caption>
       </View>
@@ -142,28 +153,46 @@ export function HealthCard({ health, change, improveTips }: HealthCardProps) {
           style={{
             backgroundColor: theme.backgroundSelected,
             borderRadius: Radius.input,
-            padding: Space[3],
+            padding: Space[4],
           }}
         >
-          <Caption color="text">
+          <Caption color="text" style={{ fontSize: 15, lineHeight: 21 }}>
             Six equally weighted factors: bills paid on time, spending against your budget, savings
             progress, debt payment progress, income remaining, and overdue payments.
           </Caption>
         </View>
       ) : null}
 
-      <Caption style={{ fontSize: 13, lineHeight: 19 }}>
+      <Caption style={{ fontSize: 16, lineHeight: 24 }}>
         Your Budget Health Score is an educational estimate designed to help you understand your
         budgeting progress. It is not financial advice or a credit score.
       </Caption>
 
-      <Button
-        label="See How to Improve"
-        variant="panel"
-        shape="rounded"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="See how to improve your budget health score"
         aria-expanded={improveOpen}
         onPress={() => setImproveOpen((open) => !open)}
-      />
+        style={({ pressed }) => ({
+          minHeight: 64,
+          borderRadius: Radius.smallCard,
+          backgroundColor: theme.panel,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <ThemedText
+          style={{
+            color: theme.onPanel,
+            fontFamily: Fonts.body.bold,
+            fontSize: 18,
+            lineHeight: 24,
+          }}
+        >
+          See How to Improve
+        </ThemedText>
+      </Pressable>
 
       {improveOpen ? (
         <View style={{ gap: Space[2] }}>
