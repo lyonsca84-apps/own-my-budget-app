@@ -5,6 +5,7 @@ import {
   getFeatureUsageCount,
   sendBudgetBuddyMessage,
   type BudgetBuddyHistoryMessage,
+  type BudgetBuddyMessageOptions,
 } from '@own-my-budget/api';
 import {
   evaluateFeatureGate,
@@ -33,8 +34,13 @@ export interface BudgetBuddyChat {
   /** Set when the server says the plan's allowance is used up. */
   limitReason: string | null;
   reloadGate: () => Promise<void>;
-  /** Sends `text` (or the current draft). Resolves once the reply — or an error — is in. */
-  send: (text?: string) => Promise<void>;
+  /**
+   * Sends `text` (or the current draft). Resolves once the reply — or an
+   * error — is in, with the reply text, or null when nothing was sent or it
+   * failed. Typed and spoken messages both come through here, so they share
+   * one conversation; a spoken one passes `{ mode: 'voice' }`.
+   */
+  send: (text?: string, options?: BudgetBuddyMessageOptions) => Promise<string | null>;
   clear: () => void;
 }
 
@@ -54,6 +60,8 @@ export function useBudgetBuddyChat(initialDraft = ''): BudgetBuddyChat {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [limitReason, setLimitReason] = useState<string | null>(null);
   const counter = useRef(0);
+  /** Set synchronously, so two sends in the same tick can't both get past the `isSending` state. */
+  const sendingRef = useRef(false);
 
   const reloadGate = useCallback(async () => {
     if (status !== 'signedIn' || !user) return;
@@ -78,9 +86,10 @@ export function useBudgetBuddyChat(initialDraft = ''): BudgetBuddyChat {
   }, [status, user]);
 
   const send = useCallback(
-    async (text?: string) => {
+    async (text?: string, options?: BudgetBuddyMessageOptions) => {
       const content = (text ?? draft).trim();
-      if (!content || !gate?.allowed || isSending) return;
+      if (!content || !gate?.allowed || isSending || sendingRef.current) return null;
+      sendingRef.current = true;
       const userMessage: ChatMessage = {
         id: `user-${counter.current++}`,
         role: 'user',
@@ -93,13 +102,20 @@ export function useBudgetBuddyChat(initialDraft = ''): BudgetBuddyChat {
       setLimitReason(null);
       setIsSending(true);
       try {
-        const reply = await sendBudgetBuddyMessage(supabase, content, history);
+        const reply = await sendBudgetBuddyMessage(supabase, content, history, options);
         setMessages((prev) => [
           ...prev,
           { id: `assistant-${counter.current++}`, role: 'assistant', content: reply },
         ]);
         await reloadGate();
+        return reply;
       } catch (error) {
+        if (options?.signal?.aborted) {
+          // Cancelled on purpose (a voice turn's Cancel) — not an error, and
+          // there's no typed draft to restore.
+          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+          return null;
+        }
         if (error instanceof EdgeFunctionError && error.code === 'usage_limit') {
           setLimitReason(error.message);
         } else {
@@ -112,7 +128,9 @@ export function useBudgetBuddyChat(initialDraft = ''): BudgetBuddyChat {
         // Put the words back so nothing the user typed is lost.
         setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
         setDraft(content);
+        return null;
       } finally {
+        sendingRef.current = false;
         setIsSending(false);
       }
     },

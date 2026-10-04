@@ -784,6 +784,26 @@ describe('Edge Functions in guest mode', () => {
           }),
       ],
       ['createPortalSession', () => api.createPortalSession(client, 'x')],
+      ['routeIntent', () => api.routeIntent(client, 'I paid Georgia Power $75 yesterday.')],
+      [
+        'proposeBillPayment',
+        () => api.proposeBillPayment(client, 'I paid Georgia Power $75 yesterday.'),
+      ],
+      // Budget Buddy voice is account-only: a guest never reaches a paid provider.
+      ['getBuddyVoiceStatus', () => api.getBuddyVoiceStatus(client)],
+      [
+        'transcribeBuddyAudio',
+        () =>
+          api.transcribeBuddyAudio(client, {
+            requestId: 'request-0001',
+            audioBase64: 'GkXfow==',
+            durationMs: 1000,
+          }),
+      ],
+      [
+        'synthesizeBuddySpeech',
+        () => api.synthesizeBuddySpeech(client, { requestId: 'request-0001', text: 'Hi.' }),
+      ],
     ];
     for (const [name, call] of calls) {
       covered.add(name);

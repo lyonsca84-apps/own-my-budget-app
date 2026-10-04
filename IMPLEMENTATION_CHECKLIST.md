@@ -226,6 +226,22 @@ Running log, updated after every milestone. See `PLAN.md` for product scope and 
 
 **Known limitations carried forward:** Native iOS has still never been visually verified on an actual simulator (environment-blocked, see above — the user needs to install Xcode). No dedicated crash-reporting or analytics service (a product decision, not built without the user's input). The receipt/pantry image-not-uploaded-to-Storage gap from Phase 6 and the "sets rather than accumulates" paycheck-assignment gap from Phase 4 are unchanged — this phase was an audit/hardening pass against what exists, not a feature-completion pass, so pre-existing, already-documented feature gaps from earlier phases were intentionally left alone rather than pulled into scope here.
 
+## Budget Buddy voice (tap-to-talk) — 2026-10-04
+
+**Status: deployed to Supabase project `soapkqeaodjawxrvslob` and switched ON (2026-10-04). Full detail in [`docs/voice-setup.md`](./docs/voice-setup.md).**
+
+- [x] Deployed 2026-10-04: voice ledger migration applied (through the Supabase connection, so its remote version stamp differs from the local filename — same as every earlier migration; do not `supabase db push`), `budget-buddy-voice` and `budget-buddy-chat` deployed, secrets `OPENROUTER_API_KEY` and `BUDDY_VOICE_ENABLED=true` set. Verified live: both functions refuse a caller with no user session; ledger write functions are server-only. **Not yet verified live:** a signed-in voice turn with a real microphone.
+
+- [x] Turn-based voice inside the existing Budget Buddy composer (floating panel and `/helper`): Talk to Buddy → Done → transcript appears in the same conversation → existing Buddy answers → answer is read aloud. Controls for Cancel recording, Stop audio, Replay/Listen, Play reply (autoplay blocked), Spoken replies on/off; recording timer with a 60 s cap; "Budget Buddy uses an AI-generated voice."
+- [x] New Edge Function `budget-buddy-voice` (OpenRouter `/audio/transcriptions` + `/audio/speech`). `budget-buddy-chat` gained an optional `mode: 'voice'` (same model, snapshot, and `budgetBuddyAction` allowance) and a read-only Budget Missions context boundary.
+- [x] New migration `20261004140000_voice_usage_ledger.sql`: atomic per-user allowance, rate limit, duplicate-request guard, and app-wide monthly spend cap. No audio or transcripts stored.
+- [x] **Deviation from the brief:** the requested OpenAI voice (`openai/gpt-4o-mini-tts-2025-12-15`) no longer exists on OpenRouter, and no OpenAI model is served on its speech endpoint. Default speech model is `microsoft/mai-voice-2.1-flash` (voice `en-US-Harper`); transcription is `openai/gpt-4o-mini-transcribe`. Both are env-configurable.
+- [x] Checks: typecheck, lint, Jest (voice handler + API wrappers), migration executed on Postgres 18, live OpenRouter round trip, recorder/player in headless Chrome.
+
+**Next step:** test in the running app with a real microphone in Chrome and Safari, signed in on a paid plan (Free shows a "paid plans" note instead of the Talk button). To switch voice off: `supabase secrets set BUDDY_VOICE_ENABLED=false --project-ref soapkqeaodjawxrvslob`.
+
+**Known limitations carried forward:** web only (native iOS/Android needs a native audio module — the controls do not render there); the deployed function, Safari/Firefox, mobile browsers, and screen readers are untested; speech cost is an estimate (the provider returns none); the selected budget month is not passed to Buddy (month selection is local to the dashboard), so Buddy uses its existing snapshot.
+
 ## Phase 10 — GitHub finalization, staging deployment, production checklist, store submission prep
 
 **Status: GitHub finalization complete and CI-verified live on GitHub. Staging deployment (Vercel) remains on hold per your explicit choice — not a blocker, a deliberate pause.**

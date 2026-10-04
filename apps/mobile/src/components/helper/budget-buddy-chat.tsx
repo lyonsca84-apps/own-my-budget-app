@@ -10,6 +10,8 @@ import { Fonts, Layout, Radius, Space } from '@/constants/theme';
 import { BrandAssets } from '@/design-system/assets/brand';
 import { useTheme } from '@/hooks/use-theme';
 
+import { BuddyVoiceControls } from './buddy-voice-controls';
+import { useBuddyVoice } from './use-buddy-voice';
 import type { BudgetBuddyChat as ChatState } from './use-budget-buddy-chat';
 
 export const SUGGESTED_PROMPTS = [
@@ -40,8 +42,18 @@ export function BudgetBuddyChat({ chat, onNavigate }: BudgetBuddyChatProps) {
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const { gate, messages, isSending, draft } = chat;
+  const voice = useBuddyVoice(chat);
+  // While a spoken message is being recorded or worked on, typing waits its
+  // turn — one message at a time, in one conversation.
+  const voiceBusy =
+    voice.phase === 'listening' || voice.phase === 'transcribing' || voice.phase === 'thinking';
   const blocked = gate !== null && !gate.allowed;
-  const canSend = !!draft.trim() && !!gate?.allowed && !isSending;
+  const canSend = !!draft.trim() && !!gate?.allowed && !isSending && !voiceBusy;
+
+  function sendTyped(text?: string) {
+    voice.stopAudio();
+    void chat.send(text);
+  }
 
   function go(href: (typeof SHORTCUTS)[number]['href']) {
     onNavigate?.();
@@ -145,8 +157,8 @@ export function BudgetBuddyChat({ chat, onNavigate }: BudgetBuddyChatProps) {
                 key={prompt}
                 accessibilityRole="button"
                 accessibilityLabel={`Ask: ${prompt}`}
-                disabled={!gate?.allowed || isSending}
-                onPress={() => chat.send(prompt)}
+                disabled={!gate?.allowed || isSending || voiceBusy}
+                onPress={() => sendTyped(prompt)}
                 style={({ pressed }) => ({
                   minHeight: Layout.minimumTouchTarget,
                   justifyContent: 'center',
@@ -198,6 +210,8 @@ export function BudgetBuddyChat({ chat, onNavigate }: BudgetBuddyChatProps) {
           </ThemedText>
         ) : null}
 
+        <BuddyVoiceControls voice={voice} />
+
         <View style={{ flexDirection: 'row', gap: Space[2], alignItems: 'flex-end' }}>
           <TextInput
             accessibilityLabel="Message Budget Buddy"
@@ -211,7 +225,7 @@ export function BudgetBuddyChat({ chat, onNavigate }: BudgetBuddyChatProps) {
               const native = event.nativeEvent as unknown as { key: string; shiftKey?: boolean };
               if (Platform.OS === 'web' && native.key === 'Enter' && !native.shiftKey) {
                 event.preventDefault();
-                chat.send();
+                if (canSend) sendTyped();
               }
             }}
             style={{
@@ -231,7 +245,7 @@ export function BudgetBuddyChat({ chat, onNavigate }: BudgetBuddyChatProps) {
           />
           <Button
             label={isSending ? 'Sending…' : 'Send'}
-            onPress={() => chat.send()}
+            onPress={() => sendTyped()}
             disabled={!canSend}
           />
         </View>

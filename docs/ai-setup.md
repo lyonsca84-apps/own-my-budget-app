@@ -22,6 +22,10 @@ Set it via the Supabase dashboard (Project Settings → Edge Functions → Secre
 
 Model IDs are current as of 2026-09-04. If Anthropic ships a newer generation, update `ai-config.ts` only — nothing else references a model string.
 
+## Budget Buddy voice
+
+Tap-to-talk is documented separately in [`voice-setup.md`](./voice-setup.md). It adds one function (`budget-buddy-voice`, OpenRouter speech-to-text and text-to-speech) around this same `budget-buddy-chat` function, which keeps the model above. It is off until `BUDDY_VOICE_ENABLED=true`.
+
 ## Usage limits
 
 Enforced server-side in `supabase/functions/_shared/feature-limits.ts`, duplicated from `packages/core/src/resources.ts`'s `FEATURE_REGISTRY` (Edge Functions run on Deno and can't import the npm workspace package). **If you change a limit in `resources.ts`, update `feature-limits.ts` to match** — there's no automated sync between them.
