@@ -31,6 +31,19 @@ function showAlert(message: string | null): void {
   alert.hidden = !message;
 }
 
+/** Email already registered: point to log in or password reset, keeping the plan choice. */
+function showExistingAccount(): void {
+  const alert = $('#form-alert');
+  if (!alert) return;
+  const q = intent ? `?${intentQuery(intent)}` : '';
+  alert.innerHTML =
+    'You already have an account with that email. ' +
+    `<a href="/login${q}" style="font-weight: 600; text-decoration: underline;">Log in</a> instead, or ` +
+    '<a href="/reset-password" style="font-weight: 600; text-decoration: underline;">reset your password</a> if you’ve forgotten it.';
+  alert.hidden = false;
+  alert.querySelector<HTMLElement>('a')?.focus();
+}
+
 function fieldError(id: string, message: string | null): boolean {
   const input = $(`#${id}`) as HTMLInputElement | null;
   const error = $(`#${id}-error`);
@@ -147,6 +160,13 @@ async function initSignupOrLogin(isSignup: boolean): Promise<void> {
           options: { emailRedirectTo: `${window.location.origin}${next}` },
         });
         if (error) throw error;
+        // Supabase answers a sign-up for an existing email with a "user" that has
+        // no identities (and sends no email), so it can't be used to probe emails.
+        if (data.user && !data.session && (data.user.identities?.length ?? 0) === 0) {
+          showExistingAccount();
+          setBusy(form, false, idleLabel);
+          return;
+        }
         if (data.session) {
           window.location.assign(next);
           return;
