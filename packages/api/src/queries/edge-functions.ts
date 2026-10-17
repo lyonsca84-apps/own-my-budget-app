@@ -2,8 +2,9 @@ import type { TypedSupabaseClient } from '../client';
 
 /**
  * Thrown when an Edge Function call fails. `code` is set for known error
- * shapes (currently just 'usage_limit') so UI can branch on it — e.g. show
- * an upgrade prompt instead of a generic error banner.
+ * shapes ('usage_limit', plus the Budget Buddy voice codes listed on
+ * transcribeBuddyAudio) so UI can branch on it — e.g. show an upgrade
+ * prompt instead of a generic error banner.
  */
 export class EdgeFunctionError extends Error {
   constructor(
@@ -24,9 +25,10 @@ export class EdgeFunctionError extends Error {
 async function invokeEdgeFunction<T>(
   client: TypedSupabaseClient,
   name: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<T> {
-  const { data, error } = await client.functions.invoke(name, { body });
+  const { data, error } = await client.functions.invoke(name, signal ? { body, signal } : { body });
 
   if (error) {
     // FunctionsHttpError carries the actual Response on `.context` — the
@@ -104,16 +106,165 @@ export interface BudgetBuddyHistoryMessage {
   content: string;
 }
 
+export interface BudgetBuddyMessageOptions {
+  /** `'voice'` for a spoken message — the reply comes back short and ready to read aloud. */
+  mode?: 'voice';
+  /** Aborting stops the request locally and cancels the upstream call where the server supports it. */
+  signal?: AbortSignal;
+}
+
 export async function sendBudgetBuddyMessage(
   client: TypedSupabaseClient,
   message: string,
-  history: BudgetBuddyHistoryMessage[]
+  history: BudgetBuddyHistoryMessage[],
+  options: BudgetBuddyMessageOptions = {}
 ): Promise<string> {
-  const { reply } = await invokeEdgeFunction<{ reply: string }>(client, 'budget-buddy-chat', {
-    message,
-    history,
-  });
+  const { reply } = await invokeEdgeFunction<{ reply: string }>(
+    client,
+    'budget-buddy-chat',
+    options.mode ? { message, history, mode: options.mode } : { message, history },
+    options.signal
+  );
   return reply;
+}
+
+/** One kind of voice call's monthly allowance for the caller's plan. Never unlimited. */
+export interface BuddyVoiceAllowance {
+  limit: number;
+  used: number;
+  remaining: number;
+}
+
+/**
+ * Whether Budget Buddy voice is switched on server-side and what the
+ * caller's plan allows this month. `enabled: false` means "hide the voice
+ * controls" — typed chat is unaffected either way.
+ */
+export type BuddyVoiceStatus =
+  | { enabled: false }
+  | {
+      enabled: true;
+      maxRecordingSeconds: number;
+      /** Spoken messages (speech-to-text). */
+      transcription: BuddyVoiceAllowance;
+      /** Replies read aloud (text-to-speech). */
+      speech: BuddyVoiceAllowance;
+    };
+
+export async function getBuddyVoiceStatus(
+  client: TypedSupabaseClient,
+  signal?: AbortSignal
+): Promise<BuddyVoiceStatus> {
+  return invokeEdgeFunction<BuddyVoiceStatus>(
+    client,
+    'budget-buddy-voice',
+    { action: 'status' },
+    signal
+  );
+}
+
+/**
+ * Sends one recording for transcription. The audio is processed in memory
+ * server-side and never stored. `requestId` must be unique per tap: the
+ * server refuses a repeat (`code: 'duplicate_request'`) rather than paying
+ * for the same recording twice. Failures throw EdgeFunctionError with a
+ * customer-ready message and a `code` such as 'usage_limit',
+ * 'voice_not_in_plan', 'rate_limited', 'no_speech', or 'provider_timeout'.
+ */
+export async function transcribeBuddyAudio(
+  client: TypedSupabaseClient,
+  args: { requestId: string; audioBase64: string; durationMs: number },
+  signal?: AbortSignal
+): Promise<{ transcript: string; remaining: number }> {
+  return invokeEdgeFunction(
+    client,
+    'budget-buddy-voice',
+    { action: 'transcribe', ...args },
+    signal
+  );
+}
+
+/**
+ * Generates the spoken version of a Budget Buddy reply. `audioBase64` is a
+ * complete audio file of type `mimeType`; `truncated` is true when the
+ * reply was longer than the server's spoken-length limit (the written reply
+ * is always the full one). Same error contract as transcribeBuddyAudio.
+ */
+export async function synthesizeBuddySpeech(
+  client: TypedSupabaseClient,
+  args: { requestId: string; text: string },
+  signal?: AbortSignal
+): Promise<{ audioBase64: string; mimeType: string; truncated: boolean; remaining: number }> {
+  return invokeEdgeFunction(client, 'budget-buddy-voice', { action: 'speak', ...args }, signal);
+}
+
+/**
+ * Jev's typed intent classification for one piece of voice/text input,
+ * returned in observation mode only — this NEVER saves anything and NEVER
+ * calls Claude. `status: 'disabled' | 'fallback'` means "fall back to
+ * manual entry," not an error: the caller should treat those the same way
+ * it would if this function didn't exist at all. `status: 'blocked'` means
+ * the deterministic safety pre-filter caught the input before any model
+ * call. Not wired into any screen yet — this is the typed client entry
+ * point a future UI can call once there's a voice/text quick-add surface.
+ */
+export type RouteIntentResult =
+  | {
+      status: 'recommendation';
+      requestId: string;
+      intent: string;
+      confidence: number;
+      band: 'low' | 'medium' | 'high';
+      action: 'clarify' | 'suggest' | 'preselect';
+    }
+  | { status: 'blocked'; reason: string }
+  | { status: 'disabled' }
+  | { status: 'fallback'; reason: string };
+
+export async function routeIntent(
+  client: TypedSupabaseClient,
+  text: string
+): Promise<RouteIntentResult> {
+  return invokeEdgeFunction<RouteIntentResult>(client, 'intent-router', { text });
+}
+
+/**
+ * The complex-task orchestration loop's result for one proposed bill
+ * payment, extracted from free text via Claude, validated deterministically
+ * (bill match, amount, date), and quality-checked by Jev — up to 3 attempts.
+ * This NEVER saves anything. `status: 'proposal'` means the loop produced a
+ * reviewable proposal (`needsConfirmation` is always true for this action,
+ * since recording a payment is consequential) that the UI should pre-fill
+ * into the EXISTING record-bill-payment screen for the user to review, edit,
+ * and save themselves — the existing manual save flow is the real write
+ * path and the real confirmation, unchanged by this function.
+ * `status: 'needs_human_review' | 'blocked' | 'disabled'` all mean the same
+ * thing to the UI: fall back to the existing manual-entry screen with
+ * nothing pre-filled. Not wired into any screen yet.
+ */
+export type ProposeBillPaymentResult =
+  | {
+      status: 'proposal';
+      requestId: string;
+      needsConfirmation: boolean;
+      proposal: {
+        billId: string | null;
+        billMatch: 'exact' | 'fuzzy' | 'none';
+        amountCents: number | null;
+        paidOn: string | null;
+      };
+      confirmationToken: string;
+      expiresAt: number;
+    }
+  | { status: 'needs_human_review'; requestId?: string; reason: string }
+  | { status: 'blocked'; reason: string }
+  | { status: 'disabled' };
+
+export async function proposeBillPayment(
+  client: TypedSupabaseClient,
+  text: string
+): Promise<ProposeBillPaymentResult> {
+  return invokeEdgeFunction<ProposeBillPaymentResult>(client, 'ai-orchestrate', { text });
 }
 
 /**

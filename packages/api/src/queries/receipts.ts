@@ -73,3 +73,30 @@ export async function listReceipts(
   if (error) throw error;
   return data;
 }
+
+/** Receipts whose purchase date falls inside the range (inclusive) — receipts with no date are left out. */
+export async function listReceiptsInRange(
+  client: TypedSupabaseClient,
+  userId: string,
+  range: { fromDate?: string; toDate?: string }
+): Promise<Tables<'receipts'>[]> {
+  let query = client.from('receipts').select('*').eq('user_id', userId);
+  if (range.fromDate) query = query.gte('purchased_on', range.fromDate);
+  if (range.toDate) query = query.lte('purchased_on', range.toDate);
+  const { data, error } = await query.order('purchased_on', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function listReceiptItems(
+  client: TypedSupabaseClient,
+  receiptId: string
+): Promise<Tables<'receipt_items'>[]> {
+  const { data, error } = await client
+    .from('receipt_items')
+    .select('*')
+    .eq('receipt_id', receiptId)
+    .order('created_at');
+  if (error) throw error;
+  return data;
+}

@@ -57,7 +57,9 @@ export async function rescheduleAllNotifications(
     client.from('notification_preferences').select('*').eq('user_id', userId).single(),
     client
       .from('bills')
-      .select('label, amount_cents, due_date')
+      // '*' (not a column list) so this keeps working before the
+      // reminder_enabled column from migration 20260920100000 exists.
+      .select('*')
       .eq('user_id', userId)
       .is('archived_at', null),
     client
@@ -74,6 +76,8 @@ export async function rescheduleAllNotifications(
 
   if (prefs.bill_reminders_enabled) {
     for (const bill of billsResult.data) {
+      // Bills & Debt lets a bill's reminder be switched off individually.
+      if (bill.reminder_enabled === false) continue;
       const dueDate = parseLocalDate(bill.due_date);
       const reminderDate = atNineAm(
         new Date(

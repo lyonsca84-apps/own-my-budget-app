@@ -110,6 +110,7 @@ export default function SignInScreen() {
 
               <Button
                 label={isSubmitting ? 'Logging in…' : 'Log in'}
+                variant="panel"
                 onPress={handleSignIn}
                 disabled={isSubmitting || !email || !password}
               />

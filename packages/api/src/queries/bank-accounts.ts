@@ -1,5 +1,5 @@
 import type { TypedSupabaseClient } from '../client';
-import type { Tables } from '../database.types';
+import type { Tables, TablesInsert } from '../database.types';
 
 export async function listAccounts(
   client: TypedSupabaseClient,
@@ -11,6 +11,15 @@ export async function listAccounts(
     .eq('user_id', userId)
     .is('archived_at', null)
     .order('created_at');
+  if (error) throw error;
+  return data;
+}
+
+export async function createAccount(
+  client: TypedSupabaseClient,
+  account: TablesInsert<'accounts'>
+): Promise<Tables<'accounts'>> {
+  const { data, error } = await client.from('accounts').insert(account).select().single();
   if (error) throw error;
   return data;
 }

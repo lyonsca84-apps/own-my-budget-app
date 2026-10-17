@@ -5,6 +5,9 @@
   "private": true,
   "description": "Own My Budget — Expo Router app shell (iOS + Web for v1). Screens are built phase by phase per PLAN.md, with a preview and approval before each phase.",
   "dependencies": {
+    "@expo-google-fonts/figtree": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/ui": "~57.0.16",
     "@own-my-budget/api": "*",
     "@own-my-budget/core": "*",
@@ -17,6 +20,7 @@
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.4",
     "expo-image-picker": "~57.0.16",
+    "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.9",
     "expo-notifications": "~57.0.17",
     "expo-router": "~57.0.19",

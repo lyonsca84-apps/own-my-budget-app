@@ -170,6 +170,7 @@ export type Database = {
           reminder_days_before: number;
           updated_at: string;
           user_id: string;
+          reminder_enabled: boolean;
         };
         Insert: {
           amount_cents: number;
@@ -184,6 +185,7 @@ export type Database = {
           reminder_days_before?: number;
           updated_at?: string;
           user_id: string;
+          reminder_enabled?: boolean;
         };
         Update: {
           amount_cents?: number;
@@ -198,6 +200,7 @@ export type Database = {
           reminder_days_before?: number;
           updated_at?: string;
           user_id?: string;
+          reminder_enabled?: boolean;
         };
         Relationships: [
           {
@@ -218,6 +221,7 @@ export type Database = {
       };
       budget_lines: {
         Row: {
+          actual_override_cents: number | null;
           budget_period_id: string;
           category_id: string;
           created_at: string;
@@ -227,6 +231,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          actual_override_cents?: number | null;
           budget_period_id: string;
           category_id: string;
           created_at?: string;
@@ -236,6 +241,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          actual_override_cents?: number | null;
           budget_period_id?: string;
           category_id?: string;
           created_at?: string;
@@ -406,6 +412,20 @@ export type Database = {
           type: string;
           updated_at: string;
           user_id: string;
+          card_style: string | null;
+          card_text_mode: string;
+          issuer: string | null;
+          last4: string | null;
+          lender: string | null;
+          network: string | null;
+          notes: string | null;
+          original_balance_cents: number | null;
+          planned_payment_cents: number | null;
+          promo_apr_basis_points: number | null;
+          promo_balance_cents: number | null;
+          promo_expires_on: string | null;
+          started_on: string | null;
+          term_months: number | null;
         };
         Insert: {
           apr_basis_points?: number;
@@ -420,6 +440,20 @@ export type Database = {
           type?: string;
           updated_at?: string;
           user_id: string;
+          card_style?: string | null;
+          card_text_mode?: string;
+          issuer?: string | null;
+          last4?: string | null;
+          lender?: string | null;
+          network?: string | null;
+          notes?: string | null;
+          original_balance_cents?: number | null;
+          planned_payment_cents?: number | null;
+          promo_apr_basis_points?: number | null;
+          promo_balance_cents?: number | null;
+          promo_expires_on?: string | null;
+          started_on?: string | null;
+          term_months?: number | null;
         };
         Update: {
           apr_basis_points?: number;
@@ -434,6 +468,20 @@ export type Database = {
           type?: string;
           updated_at?: string;
           user_id?: string;
+          card_style?: string | null;
+          card_text_mode?: string;
+          issuer?: string | null;
+          last4?: string | null;
+          lender?: string | null;
+          network?: string | null;
+          notes?: string | null;
+          original_balance_cents?: number | null;
+          planned_payment_cents?: number | null;
+          promo_apr_basis_points?: number | null;
+          promo_balance_cents?: number | null;
+          promo_expires_on?: string | null;
+          started_on?: string | null;
+          term_months?: number | null;
         };
         Relationships: [
           {
@@ -530,6 +578,7 @@ export type Database = {
       goal_activity: {
         Row: {
           amount_cents: number;
+          challenge_week: number | null;
           created_at: string;
           goal_id: string;
           id: string;
@@ -540,6 +589,7 @@ export type Database = {
         };
         Insert: {
           amount_cents: number;
+          challenge_week?: number | null;
           created_at?: string;
           goal_id: string;
           id?: string;
@@ -550,6 +600,7 @@ export type Database = {
         };
         Update: {
           amount_cents?: number;
+          challenge_week?: number | null;
           created_at?: string;
           goal_id?: string;
           id?: string;
@@ -921,6 +972,57 @@ export type Database = {
           },
         ];
       };
+      payday_assignments: {
+        Row: {
+          amount_cents: number;
+          created_at: string;
+          id: string;
+          income_source_id: string;
+          pay_date: string;
+          target_id: string;
+          target_type: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          amount_cents: number;
+          created_at?: string;
+          id?: string;
+          income_source_id: string;
+          pay_date: string;
+          target_id: string;
+          target_type: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          amount_cents?: number;
+          created_at?: string;
+          id?: string;
+          income_source_id?: string;
+          pay_date?: string;
+          target_id?: string;
+          target_type?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payday_assignments_income_source_id_fkey';
+            columns: ['income_source_id'];
+            isOneToOne: false;
+            referencedRelation: 'income_sources';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payday_assignments_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       payoff_plans: {
         Row: {
           created_at: string;
@@ -929,6 +1031,9 @@ export type Database = {
           strategy: string;
           updated_at: string;
           user_id: string;
+          card_goal_monthly_cents: number | null;
+          card_goal_target_cents: number | null;
+          card_goal_target_date: string | null;
         };
         Insert: {
           created_at?: string;
@@ -937,6 +1042,9 @@ export type Database = {
           strategy?: string;
           updated_at?: string;
           user_id: string;
+          card_goal_monthly_cents?: number | null;
+          card_goal_target_cents?: number | null;
+          card_goal_target_date?: string | null;
         };
         Update: {
           created_at?: string;
@@ -945,6 +1053,9 @@ export type Database = {
           strategy?: string;
           updated_at?: string;
           user_id?: string;
+          card_goal_monthly_cents?: number | null;
+          card_goal_target_cents?: number | null;
+          card_goal_target_date?: string | null;
         };
         Relationships: [
           {
@@ -980,6 +1091,7 @@ export type Database = {
           currency: string;
           display_name: string;
           id: string;
+          onboarding_completed_at: string | null;
           timezone: string;
           updated_at: string;
         };
@@ -988,6 +1100,7 @@ export type Database = {
           currency?: string;
           display_name?: string;
           id: string;
+          onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
         };
@@ -996,6 +1109,7 @@ export type Database = {
           currency?: string;
           display_name?: string;
           id?: string;
+          onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
         };
@@ -1101,31 +1215,43 @@ export type Database = {
       };
       savings_challenges: {
         Row: {
+          block_notes: Json;
           cadence: string;
           challenge_type: string;
           created_at: string;
           goal_id: string | null;
           id: string;
+          multiplier: number;
+          notes: string | null;
+          start_date: string | null;
           total_weeks: number;
           updated_at: string;
           user_id: string;
         };
         Insert: {
+          block_notes?: Json;
           cadence?: string;
           challenge_type?: string;
           created_at?: string;
           goal_id?: string | null;
           id?: string;
+          multiplier?: number;
+          notes?: string | null;
+          start_date?: string | null;
           total_weeks?: number;
           updated_at?: string;
           user_id: string;
         };
         Update: {
+          block_notes?: Json;
           cadence?: string;
           challenge_type?: string;
           created_at?: string;
           goal_id?: string | null;
           id?: string;
+          multiplier?: number;
+          notes?: string | null;
+          start_date?: string | null;
           total_weeks?: number;
           updated_at?: string;
           user_id?: string;
@@ -1149,36 +1275,60 @@ export type Database = {
       };
       savings_goals: {
         Row: {
+          account_label: string | null;
           archived_at: string | null;
+          category: string | null;
+          color: string | null;
           created_at: string;
+          frequency: string;
           id: string;
           is_challenge: boolean;
           label: string;
+          notes: string | null;
+          paused_at: string | null;
+          planned_deposit_cents: number | null;
           saved_cents: number;
+          start_date: string | null;
           target_cents: number;
           target_date: string | null;
           updated_at: string;
           user_id: string;
         };
         Insert: {
+          account_label?: string | null;
           archived_at?: string | null;
+          category?: string | null;
+          color?: string | null;
           created_at?: string;
+          frequency?: string;
           id?: string;
           is_challenge?: boolean;
           label: string;
+          notes?: string | null;
+          paused_at?: string | null;
+          planned_deposit_cents?: number | null;
           saved_cents?: number;
+          start_date?: string | null;
           target_cents: number;
           target_date?: string | null;
           updated_at?: string;
           user_id: string;
         };
         Update: {
+          account_label?: string | null;
           archived_at?: string | null;
+          category?: string | null;
+          color?: string | null;
           created_at?: string;
+          frequency?: string;
           id?: string;
           is_challenge?: boolean;
           label?: string;
+          notes?: string | null;
+          paused_at?: string | null;
+          planned_deposit_cents?: number | null;
           saved_cents?: number;
+          start_date?: string | null;
           target_cents?: number;
           target_date?: string | null;
           updated_at?: string;
@@ -1368,6 +1518,60 @@ export type Database = {
           user_id: string;
         };
       };
+      delete_goal_activity: {
+        Args: {
+          p_activity_id: string;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
+      record_challenge_week: {
+        Args: {
+          p_amount_cents: number;
+          p_goal_id: string;
+          p_occurred_on: string;
+          p_week: number;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
+      update_goal_activity: {
+        Args: {
+          p_activity_id: string;
+          p_amount_cents: number;
+          p_note: string;
+          p_occurred_on: string;
+        };
+        Returns: {
+          amount_cents: number;
+          challenge_week: number | null;
+          created_at: string;
+          goal_id: string;
+          id: string;
+          kind: string;
+          note: string | null;
+          occurred_on: string;
+          user_id: string;
+        };
+      };
       record_goal_activity: {
         Args: {
           p_amount_cents: number;
@@ -1378,6 +1582,7 @@ export type Database = {
         };
         Returns: {
           amount_cents: number;
+          challenge_week: number | null;
           created_at: string;
           goal_id: string;
           id: string;

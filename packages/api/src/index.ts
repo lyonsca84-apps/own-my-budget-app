@@ -1,6 +1,7 @@
 export * from './client';
 export * from './database.types';
 export * from './queries/account';
+export * from './queries/profile';
 export * from './queries/bank-accounts';
 export * from './queries/categories';
 export * from './queries/income';
@@ -16,3 +17,4 @@ export * from './queries/receipts';
 export * from './queries/groceries';
 export * from './queries/reports';
 export * from './queries/notification-preferences';
+export * from './guest';

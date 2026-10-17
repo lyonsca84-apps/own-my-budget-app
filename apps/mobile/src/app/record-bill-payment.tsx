@@ -1,40 +1,63 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { recordBillPayment } from '@own-my-budget/api';
+import { useEffect, useState } from 'react';
+import { getBill, recordBillPayment } from '@own-my-budget/api';
 import { formatLocalDate } from '@own-my-budget/core';
+import { View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
+import { formatDollarsInput, parseDollarsToCents } from '@/components/bills/common';
+import { DateField, isValidIsoDate } from '@/components/ui/date-field';
+import { DialogScreen } from '@/components/ui/dialog';
 import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
+import { Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
 
+/** "Log payment — Rent": records what was actually paid (partial payments are fine). */
 export default function RecordBillPaymentScreen() {
-  const { user } = useAuth();
-  const { billId } = useLocalSearchParams<{ billId: string }>();
-  const [amount, setAmount] = useState('');
+  const { userId } = useDataUser();
+  const { billId, amountCents: prefillCents } = useLocalSearchParams<{
+    billId: string;
+    amountCents?: string;
+  }>();
+  // Bills & Debt passes what's still owed so "Log payment" is one tap for a full payment.
+  const prefill = Number(prefillCents);
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState(
+    Number.isFinite(prefill) && prefill > 0 ? formatDollarsInput(prefill) : ''
+  );
   const [paidOn, setPaidOn] = useState(formatLocalDate(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!billId) return;
+    let mounted = true;
+    getBill(supabase, billId)
+      .then((bill) => mounted && setName(bill.label))
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [billId]);
+
   async function handleSave() {
-    if (!user || !billId) return;
-    const amountCents = Math.round(parseFloat(amount) * 100);
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    if (!userId || !billId) return;
+    const cents = parseDollarsToCents(amount);
+    if (cents === null || cents <= 0) {
       setErrorMessage('Enter a valid amount.');
+      return;
+    }
+    if (!isValidIsoDate(paidOn)) {
+      setErrorMessage('Choose the date you paid.');
       return;
     }
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await recordBillPayment(supabase, {
-        user_id: user.id,
+        user_id: userId,
         bill_id: billId,
-        amount_cents: amountCents,
+        amount_cents: cents,
         paid_on: paidOn,
       });
       router.back();
@@ -46,43 +69,25 @@ export default function RecordBillPaymentScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Record a payment
-          </ThemedText>
-          <ThemedText themeColor="textSecondary" type="small">
-            Partial payments are fine — record what you actually paid.
-          </ThemedText>
-
-          <TextField
-            label="Amount paid"
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-          />
-          <TextField
-            label="Date paid"
-            value={paidOn}
-            onChangeText={setPaidOn}
-            placeholder="YYYY-MM-DD"
-          />
-
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save payment'}
-            onPress={handleSave}
-            disabled={isSubmitting || !amount.trim()}
-          />
-        </View>
-      </SafeAreaView>
-    </ThemedView>
+    <DialogScreen
+      title={name ? `Log payment — ${name}` : 'Log payment'}
+      subtitle="Enter an amount to apply. Partial payments are fine."
+      primaryLabel="Save"
+      onPrimary={handleSave}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+    >
+      <View style={{ gap: Space[3] }}>
+        <TextField
+          label="Amount"
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          autoFocus
+        />
+        <DateField label="Date paid" value={paidOn} onChange={setPaidOn} />
+      </View>
+    </DialogScreen>
   );
 }

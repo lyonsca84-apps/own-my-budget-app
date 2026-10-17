@@ -3,14 +3,16 @@ import type { Tables, TablesInsert } from '../database.types';
 
 export async function listCategories(
   client: TypedSupabaseClient,
-  userId: string
+  userId: string,
+  options?: { orderBy?: 'name' | 'created_at' }
 ): Promise<Tables<'categories'>[]> {
   const { data, error } = await client
     .from('categories')
     .select('*')
     .eq('user_id', userId)
     .is('archived_at', null)
-    .order('name');
+    // `created_at` keeps the order the user set categories up in (the Budget page's order).
+    .order(options?.orderBy ?? 'name');
   if (error) throw error;
   return data;
 }

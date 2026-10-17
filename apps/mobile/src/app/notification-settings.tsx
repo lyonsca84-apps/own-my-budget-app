@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -9,14 +8,14 @@ import {
 } from '@own-my-budget/api';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
 import { TextField } from '@/components/ui/text-field';
 import { useAuth } from '@/contexts/auth-context';
 import { supabase } from '@/lib/supabase';
 import { rescheduleAllNotifications } from '@/lib/notifications';
-import { Spacing } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 
 export default function NotificationSettingsScreen() {
   const { user } = useAuth();
@@ -72,100 +71,72 @@ export default function NotificationSettingsScreen() {
 
   if (!prefs) {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={{ padding: Spacing.five }}>
-            <ThemedText themeColor="textSecondary">Loading…</ThemedText>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
+      <Screen>
+        <ThemedText themeColor="textSecondary">Loading…</ThemedText>
+      </Screen>
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Notifications
-          </ThemedText>
-
-          <Card style={{ gap: Spacing.three }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText>Bill reminders</ThemedText>
-              <Button
-                label={prefs.bill_reminders_enabled ? 'On' : 'Off'}
-                variant={prefs.bill_reminders_enabled ? 'primary' : 'secondary'}
-                onPress={() => toggle('bill_reminders_enabled')}
-              />
-            </View>
-            {prefs.bill_reminders_enabled && (
-              <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-end' }}>
-                <View style={{ flex: 1 }}>
-                  <TextField
-                    label="Days before due date"
-                    value={daysBeforeInput}
-                    onChangeText={setDaysBeforeInput}
-                    keyboardType="number-pad"
-                  />
-                </View>
-                <Button
-                  label={isSaving ? 'Saving…' : 'Save'}
-                  onPress={handleSaveDaysBefore}
-                  disabled={isSaving}
-                />
-              </View>
-            )}
-
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText>Payday reminders</ThemedText>
-              <Button
-                label={prefs.payday_reminders_enabled ? 'On' : 'Off'}
-                variant={prefs.payday_reminders_enabled ? 'primary' : 'secondary'}
-                onPress={() => toggle('payday_reminders_enabled')}
-              />
-            </View>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText>Goal milestone alerts</ThemedText>
-              <Button
-                label={prefs.goal_milestone_alerts_enabled ? 'On' : 'Off'}
-                variant={prefs.goal_milestone_alerts_enabled ? 'primary' : 'secondary'}
-                onPress={() => toggle('goal_milestone_alerts_enabled')}
-              />
-            </View>
-          </Card>
-
-          {statusMessage ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              {statusMessage}
-            </ThemedText>
-          ) : null}
-
-          <ThemedText type="small" themeColor="textSecondary">
-            Reminders fire as local notifications on this device — no server needed. You may be
-            asked to allow notifications the first time one of these is turned on.
-          </ThemedText>
+    <Screen>
+      <SectionCard title="Reminders">
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <ThemedText>Bill reminders</ThemedText>
+          <Button
+            label={prefs.bill_reminders_enabled ? 'On' : 'Off'}
+            variant={prefs.bill_reminders_enabled ? 'primary' : 'secondary'}
+            onPress={() => toggle('bill_reminders_enabled')}
+          />
         </View>
-      </SafeAreaView>
-    </ThemedView>
+        {prefs.bill_reminders_enabled && (
+          <View style={{ flexDirection: 'row', gap: Space[2], alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <TextField
+                label="Days before due date"
+                value={daysBeforeInput}
+                onChangeText={setDaysBeforeInput}
+                keyboardType="number-pad"
+              />
+            </View>
+            <Button
+              label={isSaving ? 'Saving…' : 'Save'}
+              onPress={handleSaveDaysBefore}
+              disabled={isSaving}
+            />
+          </View>
+        )}
+
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <ThemedText>Payday reminders</ThemedText>
+          <Button
+            label={prefs.payday_reminders_enabled ? 'On' : 'Off'}
+            variant={prefs.payday_reminders_enabled ? 'primary' : 'secondary'}
+            onPress={() => toggle('payday_reminders_enabled')}
+          />
+        </View>
+
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <ThemedText>Goal milestone alerts</ThemedText>
+          <Button
+            label={prefs.goal_milestone_alerts_enabled ? 'On' : 'Off'}
+            variant={prefs.goal_milestone_alerts_enabled ? 'primary' : 'secondary'}
+            onPress={() => toggle('goal_milestone_alerts_enabled')}
+          />
+        </View>
+      </SectionCard>
+
+      {statusMessage ? <ThemedText themeColor="textSecondary">{statusMessage}</ThemedText> : null}
+
+      <ThemedText themeColor="textSecondary">
+        Reminders fire as local notifications on this device — no server needed. You may be asked to
+        allow notifications the first time one of these is turned on.
+      </ThemedText>
+    </Screen>
   );
 }

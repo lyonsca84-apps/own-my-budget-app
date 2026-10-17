@@ -49,3 +49,19 @@ export async function upsertBudgetLine(
   if (error) throw error;
   return data;
 }
+
+/** Read-only lookup — unlike getOrCreateBudgetPeriod, never creates a row just because someone looked at a month. */
+export async function findBudgetPeriod(
+  client: TypedSupabaseClient,
+  userId: string,
+  periodStart: string
+): Promise<Tables<'budget_periods'> | null> {
+  const { data, error } = await client
+    .from('budget_periods')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('period_start', periodStart)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}

@@ -1,4 +1,5 @@
 export * from './resources';
+export * from './budgetHealth';
 export * from './reports';
 export * from './demoData';
 export * from './money';
@@ -6,6 +7,7 @@ export * from './budgeting';
 export * from './dates';
 export * from './debt';
 export * from './savings';
+export * from './dashboard';
 export * from './featureGate';
 export * from './features/receiptScans';
 export * from './features/pantryScans';

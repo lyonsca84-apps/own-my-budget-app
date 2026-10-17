@@ -1,77 +1,166 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { createSavingsChallenge, createSavingsGoal } from '@own-my-budget/api';
-import { formatCents, generateChallengeAmounts, type ChallengeType } from '@own-my-budget/core';
+import {
+  createSavingsChallenge,
+  createSavingsGoal,
+  getSavingsGoal,
+  isMissingSavingsSchemaError,
+  listSavingsChallenges,
+  recordGoalActivity,
+  updateSavingsChallenge,
+  updateSavingsGoal,
+} from '@own-my-budget/api';
+import {
+  CHALLENGE_MULTIPLIERS,
+  GOAL_CATEGORIES,
+  GOAL_FREQUENCIES,
+  GOAL_FREQUENCY_LABELS,
+  calculateEmergencyFundTarget,
+  challengeTargetCents,
+  formatLocalDate,
+  resolveGoalCategory,
+  resolveGoalFrequency,
+  type GoalCategory,
+  type GoalFrequency,
+} from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { centsToInput, formatMoney, parseDollarsToCents } from '@/components/savings/format';
 import { Button } from '@/components/ui/button';
+import { DateField, isValidIsoDate } from '@/components/ui/date-field';
+import { DialogScreen } from '@/components/ui/dialog';
+import { SelectField } from '@/components/ui/select-field';
+import { GOAL_SWATCHES, SwatchPicker } from '@/components/ui/swatch-picker';
 import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
+import { useDataUser } from '@/contexts/auth-context';
+import { Space } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { Spacing } from '@/constants/theme';
 
-// 'custom' is a valid ChallengeType for the core function but isn't offered
-// as a UI choice here — building a custom-per-week editor is out of scope.
-const CHALLENGE_TYPES: Exclude<ChallengeType, 'custom'>[] = [
-  'classic_ascending',
-  'flat',
-  'reverse',
-];
-const CHALLENGE_LABEL: Record<ChallengeType, string> = {
-  classic_ascending: 'Classic ($1, $2, $3…)',
-  flat: 'Flat (same each week)',
-  reverse: 'Reverse (big weeks first)',
-  custom: 'Custom',
-};
+const CHALLENGE_NAME = '52-Week Money Challenge';
 
+const CATEGORY_OPTIONS = GOAL_CATEGORIES.map((c) => ({ value: c, label: c }));
+const FREQUENCY_OPTIONS = GOAL_FREQUENCIES.map((f) => ({
+  value: f,
+  label: GOAL_FREQUENCY_LABELS[f],
+}));
+const MULTIPLIER_OPTIONS = CHALLENGE_MULTIPLIERS.map((m) => ({
+  value: String(m),
+  label: `$${m} Multiplier`,
+}));
+
+/**
+ * Add / edit a savings goal (or the 52-week challenge) in the design's dialog.
+ * Params: `goalId` edits; `preset=challenge` starts the challenge;
+ * `preset=emergency` prefills an emergency fund.
+ */
 export default function AddSavingsGoalScreen() {
-  const { user } = useAuth();
-  const [label, setLabel] = useState('');
+  const { goalId, preset } = useLocalSearchParams<{
+    goalId?: string;
+    preset?: 'emergency' | 'challenge';
+  }>();
+  const isEdit = !!goalId;
+  const { userId } = useDataUser();
+
+  const [isChallenge, setIsChallenge] = useState(preset === 'challenge');
+  const [label, setLabel] = useState(
+    preset === 'emergency' ? 'Emergency Fund' : preset === 'challenge' ? CHALLENGE_NAME : ''
+  );
+  const [category, setCategory] = useState<GoalCategory>(
+    preset === 'emergency' ? 'Emergency Fund' : 'General Savings'
+  );
+  const [frequency, setFrequency] = useState<GoalFrequency>('monthly');
+  const [target, setTarget] = useState('');
+  const [current, setCurrent] = useState('');
+  const [startDate, setStartDate] = useState(formatLocalDate(new Date()));
   const [targetDate, setTargetDate] = useState('');
-  const [isChallenge, setIsChallenge] = useState(false);
-  const [challengeType, setChallengeType] = useState<ChallengeType>('classic_ascending');
-  const [flatTarget, setFlatTarget] = useState('1378'); // classic 52-week total default
-  const [manualTarget, setManualTarget] = useState('');
+  const [planned, setPlanned] = useState('');
+  const [account, setAccount] = useState('');
+  const [color, setColor] = useState<string>(GOAL_SWATCHES[0]);
+  const [notes, setNotes] = useState('');
+  const [multiplier, setMultiplier] = useState('1');
+  const [monthlyExpenses, setMonthlyExpenses] = useState('');
+  const [months, setMonths] = useState('3');
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [isLoadingGoal, setIsLoadingGoal] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const challengeAmounts = isChallenge
-    ? generateChallengeAmounts(challengeType, 52, {
-        targetCents: Math.round((parseFloat(flatTarget) || 0) * 100),
-      })
-    : null;
-  const challengeTotalCents = challengeAmounts?.reduce((a, b) => a + b, 0) ?? 0;
+  useEffect(() => {
+    if (!goalId || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const goal = await getSavingsGoal(supabase, goalId);
+        if (cancelled) return;
+        setIsChallenge(goal.is_challenge);
+        setLabel(goal.label);
+        setCategory(resolveGoalCategory(goal.category, goal.label));
+        setFrequency(resolveGoalFrequency(goal.frequency));
+        setTarget(centsToInput(goal.target_cents));
+        setCurrent(centsToInput(goal.saved_cents));
+        setStartDate((goal.start_date ?? goal.created_at).slice(0, 10));
+        setTargetDate(goal.target_date ?? '');
+        setPlanned(centsToInput(goal.planned_deposit_cents));
+        setAccount(goal.account_label ?? '');
+        setColor(goal.color ?? GOAL_SWATCHES[0]);
+        setNotes(goal.notes ?? '');
+        if (goal.is_challenge) {
+          const challenges = await listSavingsChallenges(supabase, userId);
+          const row = challenges.find((c) => c.goal_id === goal.id);
+          if (row && !cancelled) {
+            setChallengeId(row.id);
+            setMultiplier(String(row.multiplier ?? 1));
+            setStartDate((row.start_date ?? goal.start_date ?? row.created_at).slice(0, 10));
+            setNotes(row.notes ?? '');
+          }
+        }
+      } catch (error) {
+        if (!cancelled) setErrorMessage(error instanceof Error ? error.message : 'Could not load.');
+      } finally {
+        if (!cancelled) setIsLoadingGoal(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [goalId, userId]);
+
+  const suggestedEmergencyCents = useMemo(
+    () =>
+      calculateEmergencyFundTarget(
+        parseDollarsToCents(monthlyExpenses) ?? 0,
+        parseFloat(months) || 0
+      ),
+    [monthlyExpenses, months]
+  );
+  const showEmergencyHelper = !isChallenge && category === 'Emergency Fund' && !isEdit;
 
   async function handleSave() {
-    if (!user) return;
-    const targetCents = isChallenge
-      ? challengeTotalCents
-      : Math.round((parseFloat(manualTarget) || 0) * 100);
-    if (!Number.isFinite(targetCents) || targetCents <= 0) {
-      setErrorMessage('Enter a valid target amount.');
+    if (!userId) return;
+    const name = label.trim();
+    if (!name) {
+      setErrorMessage('Give your goal a name.');
       return;
     }
+    if (startDate && !isValidIsoDate(startDate)) {
+      setErrorMessage('Enter the start date as YYYY-MM-DD.');
+      return;
+    }
+    if (targetDate && !isValidIsoDate(targetDate)) {
+      setErrorMessage('Enter the target date as YYYY-MM-DD.');
+      return;
+    }
+    if (startDate && targetDate && targetDate < startDate) {
+      setErrorMessage('The target date must be on or after the start date.');
+      return;
+    }
+
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
-      const goal = await createSavingsGoal(supabase, {
-        user_id: user.id,
-        label: label.trim(),
-        target_cents: targetCents,
-        target_date: targetDate.trim() || null,
-        is_challenge: isChallenge,
-      });
-      if (isChallenge) {
-        await createSavingsChallenge(supabase, {
-          user_id: user.id,
-          goal_id: goal.id,
-          challenge_type: challengeType,
-          total_weeks: 52,
-        });
-      }
+      if (isChallenge) await saveChallenge(name);
+      else await saveGoal(name);
       router.back();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong.');
@@ -80,90 +169,320 @@ export default function AddSavingsGoalScreen() {
     }
   }
 
+  async function saveGoal(name: string) {
+    if (!userId) return;
+    const targetCents = parseDollarsToCents(target);
+    if (!targetCents || targetCents <= 0) throw new Error('Enter a target amount greater than $0.');
+    const currentCents = parseDollarsToCents(current) ?? 0;
+    const plannedCents = planned.trim() ? parseDollarsToCents(planned) : null;
+    if (planned.trim() && plannedCents === null) {
+      throw new Error('Enter the planned deposit as a dollar amount, or leave it blank.');
+    }
+    if (current.trim() && parseDollarsToCents(current) === null) {
+      throw new Error('Enter the current saved amount as a dollar amount, or leave it blank.');
+    }
+
+    const designFields = {
+      category,
+      frequency,
+      start_date: startDate || null,
+      planned_deposit_cents: plannedCents,
+      account_label: account.trim() || null,
+      color,
+      notes: notes.trim() || null,
+    };
+
+    if (isEdit && goalId) {
+      try {
+        await updateSavingsGoal(supabase, goalId, {
+          label: name,
+          target_cents: targetCents,
+          target_date: targetDate || null,
+          ...designFields,
+        });
+      } catch (error) {
+        if (!isMissingSavingsSchemaError(error)) throw error;
+        await updateSavingsGoal(supabase, goalId, {
+          label: name,
+          target_cents: targetCents,
+          target_date: targetDate || null,
+        });
+      }
+      return;
+    }
+
+    const base = {
+      user_id: userId,
+      label: name,
+      target_cents: targetCents,
+      target_date: targetDate || null,
+    };
+    let goal;
+    try {
+      goal = await createSavingsGoal(supabase, { ...base, ...designFields });
+    } catch (error) {
+      if (!isMissingSavingsSchemaError(error)) throw error;
+      goal = await createSavingsGoal(supabase, base);
+    }
+    if (currentCents > 0) {
+      // Record the starting balance as a deposit so the history always adds up to the saved total.
+      await recordGoalActivity(supabase, {
+        goalId: goal.id,
+        amountCents: currentCents,
+        kind: 'deposit',
+        occurredOn: startDate || formatLocalDate(new Date()),
+        note: 'Starting balance',
+      });
+    }
+  }
+
+  async function saveChallenge(name: string) {
+    if (!userId) return;
+    const m = Number(multiplier) || 1;
+    const start = startDate || formatLocalDate(new Date());
+    const challengeFields = { start_date: start, notes: notes.trim() || null };
+
+    if (isEdit && goalId) {
+      // The multiplier (and so the target) is changed inside the challenge dialog.
+      try {
+        await updateSavingsGoal(supabase, goalId, { label: name, start_date: start });
+      } catch (error) {
+        if (!isMissingSavingsSchemaError(error)) throw error;
+        await updateSavingsGoal(supabase, goalId, { label: name });
+      }
+      if (challengeId) {
+        try {
+          await updateSavingsChallenge(supabase, challengeId, challengeFields);
+        } catch (error) {
+          if (!isMissingSavingsSchemaError(error)) throw error;
+        }
+      }
+      return;
+    }
+
+    const goalBase = {
+      user_id: userId,
+      label: name,
+      target_cents: challengeTargetCents(52, m),
+      is_challenge: true,
+    };
+    let goal;
+    try {
+      goal = await createSavingsGoal(supabase, {
+        ...goalBase,
+        category: 'General Savings',
+        frequency: 'weekly',
+        start_date: start,
+        color,
+      });
+    } catch (error) {
+      if (!isMissingSavingsSchemaError(error)) throw error;
+      goal = await createSavingsGoal(supabase, goalBase);
+    }
+    const challengeBase = {
+      user_id: userId,
+      goal_id: goal.id,
+      challenge_type: 'classic_ascending',
+      total_weeks: 52,
+    };
+    try {
+      await createSavingsChallenge(supabase, {
+        ...challengeBase,
+        multiplier: m,
+        ...challengeFields,
+      });
+    } catch (error) {
+      if (!isMissingSavingsSchemaError(error)) throw error;
+      await createSavingsChallenge(supabase, challengeBase);
+    }
+  }
+
+  const title = isChallenge
+    ? isEdit
+      ? 'Edit challenge'
+      : 'Start a 52-week challenge'
+    : isEdit
+      ? 'Edit savings goal'
+      : 'Add savings goal';
+  const subtitle = isChallenge
+    ? 'Save a little more each week for a year.'
+    : 'Set the target, timeline, and deposit plan.';
+
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={{ padding: Spacing.five, gap: Spacing.four }}>
-          <ThemedText type="title" style={{ fontSize: 22 }}>
-            Add savings goal
-          </ThemedText>
+    <DialogScreen
+      title={title}
+      subtitle={subtitle}
+      primaryLabel={isEdit ? 'Save changes' : isChallenge ? 'Start challenge' : 'Create goal'}
+      onPrimary={handleSave}
+      primaryDisabled={isLoadingGoal || !label.trim()}
+      busy={isSubmitting}
+      errorMessage={errorMessage}
+    >
+      <View style={{ gap: Space[3] }}>
+        <TextField
+          label="Goal name"
+          hideLabel
+          placeholder="Goal name"
+          value={label}
+          onChangeText={setLabel}
+        />
 
-          <TextField
-            label="What are you saving for?"
-            value={label}
-            onChangeText={setLabel}
-            placeholder="e.g. Emergency Fund"
-          />
-
-          <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-            <Button
-              label="Regular goal"
-              variant={!isChallenge ? 'primary' : 'secondary'}
-              onPress={() => setIsChallenge(false)}
-            />
-            <Button
-              label="52-week challenge"
-              variant={isChallenge ? 'primary' : 'secondary'}
-              onPress={() => setIsChallenge(true)}
-            />
-          </View>
-
-          {isChallenge ? (
-            <>
-              <View style={{ gap: Spacing.one }}>
-                <ThemedText type="smallBold">Challenge style</ThemedText>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }}>
-                  {CHALLENGE_TYPES.map((option) => (
-                    <Button
-                      key={option}
-                      label={CHALLENGE_LABEL[option]}
-                      variant={option === challengeType ? 'primary' : 'secondary'}
-                      onPress={() => setChallengeType(option)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <TextField
-                label="Target total for the year"
-                value={flatTarget}
-                onChangeText={setFlatTarget}
-                placeholder="1378"
-                keyboardType="decimal-pad"
+        {isChallenge ? (
+          <>
+            {!isEdit ? (
+              <SelectField
+                label="Multiplier"
+                value={multiplier}
+                onChange={setMultiplier}
+                options={MULTIPLIER_OPTIONS}
               />
+            ) : null}
+            {!isEdit ? (
               <ThemedText type="small" themeColor="textSecondary">
-                52 weekly deposits totaling {formatCents(challengeTotalCents)}.
+                Week 1 is ${multiplier}, week 2 is ${Number(multiplier) * 2}, and so on up to week
+                52 — {formatMoney(challengeTargetCents(52, Number(multiplier) || 1))} in all.
               </ThemedText>
-            </>
-          ) : (
+            ) : null}
+            <DateField label="Start date" value={startDate} onChange={setStartDate} />
             <TextField
-              label="Target amount"
-              value={manualTarget}
-              onChangeText={setManualTarget}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              label="Notes (optional)"
+              hideLabel
+              placeholder="Notes (optional)"
+              rows={3}
+              value={notes}
+              onChangeText={setNotes}
             />
-          )}
+          </>
+        ) : (
+          <>
+            <Row>
+              <SelectField
+                label="Category"
+                hideLabel
+                value={category}
+                onChange={(value) => setCategory(value as GoalCategory)}
+                options={CATEGORY_OPTIONS}
+              />
+              <SelectField
+                label="Deposit frequency"
+                hideLabel
+                value={frequency}
+                onChange={(value) => setFrequency(value as GoalFrequency)}
+                options={FREQUENCY_OPTIONS}
+              />
+            </Row>
+            <Row>
+              <TextField
+                label="Target amount"
+                hideLabel
+                placeholder="Target amount"
+                keyboardType="decimal-pad"
+                value={target}
+                onChangeText={setTarget}
+              />
+              <TextField
+                label="Current saved amount"
+                hideLabel
+                placeholder="Current saved amount"
+                keyboardType="decimal-pad"
+                value={current}
+                onChangeText={setCurrent}
+                // Editing the balance directly would leave the deposit history out of step.
+                editable={!isEdit}
+                helperText={isEdit ? 'Change this by adding or editing deposits.' : undefined}
+              />
+            </Row>
 
-          <TextField
-            label="Target date (optional)"
-            value={targetDate}
-            onChangeText={setTargetDate}
-            placeholder="YYYY-MM-DD"
-          />
+            {showEmergencyHelper ? (
+              <View style={{ gap: Space[2] }}>
+                <ThemedText type="smallBold">Not sure what to aim for?</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Most people aim for three to six months of essential expenses.
+                </ThemedText>
+                <Row>
+                  <TextField
+                    label="Monthly essential expenses"
+                    placeholder="Monthly essential expenses"
+                    keyboardType="decimal-pad"
+                    value={monthlyExpenses}
+                    onChangeText={setMonthlyExpenses}
+                  />
+                  <TextField
+                    label="Months to cover"
+                    keyboardType="number-pad"
+                    value={months}
+                    onChangeText={setMonths}
+                  />
+                </Row>
+                {suggestedEmergencyCents > 0 ? (
+                  <Button
+                    label={`Use ${formatMoney(suggestedEmergencyCents)} as my target`}
+                    variant="outline"
+                    size="sm"
+                    shape="rounded"
+                    onPress={() => setTarget(centsToInput(suggestedEmergencyCents))}
+                  />
+                ) : null}
+              </View>
+            ) : null}
 
-          {errorMessage ? (
-            <ThemedText type="small" themeColor="danger">
-              {errorMessage}
-            </ThemedText>
-          ) : null}
+            <Row>
+              <DateField label="Start date" value={startDate} onChange={setStartDate} />
+              <DateField
+                label="Target date"
+                value={targetDate}
+                onChange={setTargetDate}
+                min={startDate}
+              />
+            </Row>
+            <Row>
+              <TextField
+                label="Planned deposit amount"
+                hideLabel
+                placeholder="Planned deposit amount"
+                keyboardType="decimal-pad"
+                value={planned}
+                onChangeText={setPlanned}
+              />
+              <TextField
+                label="Account / savings location"
+                hideLabel
+                placeholder="Account / savings location"
+                value={account}
+                onChangeText={setAccount}
+              />
+            </Row>
+            <SwatchPicker
+              colors={GOAL_SWATCHES}
+              value={color}
+              onChange={setColor}
+              label="Goal color"
+              names={['Teal', 'Blue', 'Navy', 'Green', 'Lime']}
+            />
+            <TextField
+              label="Notes (optional)"
+              hideLabel
+              placeholder="Notes (optional)"
+              rows={3}
+              value={notes}
+              onChangeText={setNotes}
+            />
+          </>
+        )}
+      </View>
+    </DialogScreen>
+  );
+}
 
-          <Button
-            label={isSubmitting ? 'Saving…' : 'Save goal'}
-            onPress={handleSave}
-            disabled={isSubmitting || !label.trim()}
-          />
+/** Two fields side by side, stacking on narrow screens. */
+function Row({ children }: { children: React.ReactNode[] }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
+      {children.map((child, index) => (
+        <View key={index} style={{ flexGrow: 1, flexBasis: 220, minWidth: 0 }}>
+          {child}
         </View>
-      </SafeAreaView>
-    </ThemedView>
+      ))}
+    </View>
   );
 }

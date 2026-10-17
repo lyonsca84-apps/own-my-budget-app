@@ -1,4 +1,4 @@
-import { formatCents } from '../money';
+import { formatCents, formatCentsCompact } from '../money';
 
 describe('formatCents', () => {
   it('formats whole dollars', () => {
@@ -15,5 +15,13 @@ describe('formatCents', () => {
 
   it('formats zero', () => {
     expect(formatCents(0)).toBe('$0.00');
+  });
+});
+
+describe('formatCentsCompact', () => {
+  it('drops ".00" on whole dollars only', () => {
+    expect(formatCentsCompact(125_000)).toBe('$1,250');
+    expect(formatCentsCompact(125_050)).toBe('$1,250.50');
+    expect(formatCentsCompact(0)).toBe('$0');
   });
 });

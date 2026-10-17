@@ -1,6 +1,6 @@
 import { View, type ViewProps } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { CardShadow, Layout, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export function Card({ style, ...props }: ViewProps) {
@@ -11,11 +11,10 @@ export function Card({ style, ...props }: ViewProps) {
       style={[
         {
           backgroundColor: theme.backgroundElement,
-          borderRadius: Spacing.four,
-          borderWidth: 1,
-          borderColor: theme.border,
-          padding: Spacing.four,
+          borderRadius: Radius.card,
+          padding: Layout.cardPadding,
         },
+        CardShadow,
         style,
       ]}
       {...props}

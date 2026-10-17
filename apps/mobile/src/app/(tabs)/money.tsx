@@ -1,304 +1,554 @@
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  listDebtsWithPayments,
-  listSavingsGoals,
-  type DebtWithPayments,
-  type Tables,
-} from '@own-my-budget/api';
-import {
-  calculateCreditUtilization,
-  calculatePayoffSchedule,
-  calculateSavingsProgress,
-  formatCents,
-  type DebtInput,
-} from '@own-my-budget/core';
+import { useCallback, useState, type ReactNode } from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
+import { type GoalStatus } from '@own-my-budget/core';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { ActivitySection } from '@/components/savings/activity-section';
+import { BadgeTile } from '@/components/savings/badge-tile';
+import { formatMoney } from '@/components/savings/format';
+import { GoalDetails } from '@/components/savings/goal-details';
+import { MissionRow } from '@/components/savings/mission-row';
+import { StatCard } from '@/components/savings/stat-card';
+import {
+  useSavingsData,
+  type ChallengeView,
+  type GoalActivityView,
+  type GoalView,
+} from '@/components/savings/use-savings-data';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatusPill } from '@/components/ui/status-pill';
-import { TextField } from '@/components/ui/text-field';
-import { useAuth } from '@/contexts/auth-context';
-import { supabase } from '@/lib/supabase';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { GoalCard } from '@/components/ui/goal-card';
+import { PageHeader } from '@/components/ui/page-header';
+import { Screen } from '@/components/ui/screen';
+import { SectionCard } from '@/components/ui/section-card';
+import type { StatusTone } from '@/components/ui/status-pill';
+import { Brand, Fonts, Radius, Space } from '@/constants/theme';
+import { BrandAssets } from '@/design-system/assets/brand';
+import { useTheme } from '@/hooks/use-theme';
 
-export default function MoneyScreen() {
-  const { status, user } = useAuth();
-  const [debts, setDebts] = useState<DebtWithPayments[]>([]);
-  const [goals, setGoals] = useState<Tables<'savings_goals'>[]>([]);
-  const [extraMonthly, setExtraMonthly] = useState('0');
-  const [isLoading, setIsLoading] = useState(true);
+const STATUS_LABEL: Record<GoalStatus, { label: string; tone: StatusTone }> = {
+  completed: { label: 'Completed', tone: 'success' },
+  onTrack: { label: 'On Track', tone: 'accent' },
+  // Clay, not red: behind pace is a nudge, not a failure. The words carry the meaning too.
+  behind: { label: 'Behind Schedule', tone: 'danger' },
+  inProgress: { label: 'In Progress', tone: 'info' },
+  notStarted: { label: 'Not Started', tone: 'neutral' },
+  paused: { label: 'Paused', tone: 'neutral' },
+};
 
-  const reload = useCallback(async () => {
-    if (status !== 'signedIn' || !user) return;
-    setIsLoading(true);
-    const [d, g] = await Promise.all([
-      listDebtsWithPayments(supabase, user.id),
-      listSavingsGoals(supabase, user.id),
-    ]);
-    setDebts(d);
-    setGoals(g);
-    setIsLoading(false);
-  }, [status, user]);
+const GRID_GAP = Space[5];
+const MIN_CARD_WIDTH = 290;
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload])
-  );
-
-  const debtInputs: DebtInput[] = useMemo(
-    () =>
-      debts.map((d) => ({
-        id: d.id,
-        balanceCents: d.balance_cents,
-        aprBasisPoints: d.apr_basis_points,
-        minimumPaymentCents: d.minimum_payment_cents,
-      })),
-    [debts]
-  );
-  const extraMonthlyCents = Math.round((parseFloat(extraMonthly) || 0) * 100);
-  const snowball =
-    debtInputs.length > 0
-      ? calculatePayoffSchedule(debtInputs, extraMonthlyCents, 'snowball')
-      : null;
-  const avalanche =
-    debtInputs.length > 0
-      ? calculatePayoffSchedule(debtInputs, extraMonthlyCents, 'avalanche')
-      : null;
-
-  if (status === 'guest') {
-    return (
-      <ThemedView style={{ flex: 1 }}>
-        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-          <View style={{ flex: 1, justifyContent: 'center', padding: Spacing.four }}>
-            <EmptyState
-              title="Plan your payoff and savings"
-              message="Guest mode shows sample data only. Create a free account to track your own debts and savings goals."
-            />
-            <View style={{ marginTop: Spacing.three }}>
-              <Button label="Create an account" onPress={() => router.push('/sign-up')} />
-            </View>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
-    );
-  }
+/** Lays cards out in equal columns (up to three, as in the design) so a lone last card keeps its column width. */
+function CardGrid({ children }: { children: ReactNode[] }) {
+  const [width, setWidth] = useState(0);
+  const columns = width
+    ? Math.max(1, Math.min(3, Math.floor((width + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))))
+    : 1;
+  const cardWidth = width ? (width - GRID_GAP * (columns - 1)) / columns : undefined;
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView contentContainerStyle={{ padding: Spacing.four, gap: Spacing.four }}>
-          <View
-            style={{
-              width: '100%',
-              maxWidth: MaxContentWidth,
-              alignSelf: 'center',
-              gap: Spacing.four,
-            }}
-          >
-            <ThemedText type="title" style={{ fontSize: 24 }}>
-              Money
-            </ThemedText>
-
-            {/* ---------- Debt ---------- */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText type="smallBold">Debt</ThemedText>
-              <Button
-                label="+ Add debt"
-                variant="secondary"
-                onPress={() => router.push('/add-debt')}
-              />
-            </View>
-
-            {!isLoading && debts.length === 0 && (
-              <EmptyState
-                title="No debts tracked"
-                message="Add a credit card, loan, or mortgage to get started."
-              />
-            )}
-
-            {debts.map((debt) => {
-              const paidCents = debt.debt_payments.reduce((sum, p) => sum + p.amount_cents, 0);
-              const utilization =
-                debt.type === 'creditCard' && debt.credit_limit_cents
-                  ? calculateCreditUtilization(debt.balance_cents, debt.credit_limit_cents)
-                  : null;
-              return (
-                <Card key={debt.id} style={{ gap: Spacing.two }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <ThemedText style={{ fontWeight: '700' }}>{debt.label}</ThemedText>
-                    <ThemedText style={{ fontWeight: '700' }}>
-                      {formatCents(debt.balance_cents)}
-                    </ThemedText>
-                  </View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {(debt.apr_basis_points / 100).toFixed(2)}% APR ·{' '}
-                    {formatCents(debt.minimum_payment_cents)}/mo min
-                    {utilization !== null ? ` · ${utilization.toFixed(0)}% utilized` : ''}
-                    {paidCents > 0 ? ` · ${formatCents(paidCents)} paid so far` : ''}
-                  </ThemedText>
-                  <View style={{ alignSelf: 'flex-start' }}>
-                    <Button
-                      label="Record payment"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/record-debt-payment',
-                          params: { debtId: debt.id },
-                        })
-                      }
-                    />
-                  </View>
-                </Card>
-              );
-            })}
-
-            {debts.length > 0 && (
-              <Card style={{ gap: Spacing.three }}>
-                <ThemedText type="smallBold">Payoff plan: snowball vs. avalanche</ThemedText>
-                <TextField
-                  label="Extra you can put toward debt each month"
-                  value={extraMonthly}
-                  onChangeText={setExtraMonthly}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
-                />
-                <View style={{ flexDirection: 'row', gap: Spacing.three }}>
-                  <PayoffSummary title="Snowball" result={snowball} />
-                  <PayoffSummary title="Avalanche" result={avalanche} />
-                </View>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Snowball pays off the smallest balance first; avalanche pays off the highest
-                  interest rate first (usually less total interest).
-                </ThemedText>
-              </Card>
-            )}
-
-            {/* ---------- Savings ---------- */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <ThemedText type="smallBold">Savings goals</ThemedText>
-              <Button
-                label="+ Add goal"
-                variant="secondary"
-                onPress={() => router.push('/add-savings-goal')}
-              />
-            </View>
-
-            {!isLoading && goals.length === 0 && (
-              <EmptyState
-                title="No savings goals yet"
-                message="Set your first goal — an emergency fund is a great start."
-              />
-            )}
-
-            {goals.map((goal) => {
-              const progress = calculateSavingsProgress(goal.saved_cents, goal.target_cents);
-              return (
-                <Card key={goal.id} style={{ gap: Spacing.two }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <ThemedText style={{ fontWeight: '700' }}>{goal.label}</ThemedText>
-                    {progress.isComplete && <StatusPill label="Reached!" tone="success" />}
-                  </View>
-                  <ThemedText themeColor="textSecondary" type="small">
-                    {formatCents(goal.saved_cents)} of {formatCents(goal.target_cents)} (
-                    {progress.percent.toFixed(0)}%)
-                  </ThemedText>
-                  <View
-                    style={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: '#00000014',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <View
-                      style={{
-                        height: '100%',
-                        width: `${progress.percent}%`,
-                        backgroundColor: progress.isComplete ? '#2F8F4E' : '#0B6FB8',
-                      }}
-                    />
-                  </View>
-                  {!progress.isComplete && goal.target_date && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Target date: {goal.target_date}
-                    </ThemedText>
-                  )}
-                  <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                    <Button
-                      label="Add deposit"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/add-goal-activity',
-                          params: { goalId: goal.id, kind: 'deposit' },
-                        })
-                      }
-                    />
-                    <Button
-                      label="Withdraw"
-                      variant="secondary"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/add-goal-activity',
-                          params: { goalId: goal.id, kind: 'withdrawal' },
-                        })
-                      }
-                    />
-                  </View>
-                </Card>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+    <View
+      onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP, alignItems: 'flex-start' }}
+    >
+      {children.map((child, index) => (
+        <View key={index} style={{ width: cardWidth ?? '100%', minWidth: 0 }}>
+          {child}
+        </View>
+      ))}
+    </View>
   );
 }
 
-function PayoffSummary({
-  title,
-  result,
-}: {
-  title: string;
-  result: { months: number; totalInterestCents: number; payoffDate: string } | null;
-}) {
+export default function MoneyScreen() {
+  const theme = useTheme();
+  const data = useSavingsData();
+  const { refresh } = data;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openBadgeId, setOpenBadgeId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh])
+  );
+
+  const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id));
+
+  const run = async (id: string, action: () => Promise<void>, fallback: string) => {
+    try {
+      await action();
+      setActionError(null);
+    } catch (error) {
+      setActionError({ id, message: error instanceof Error ? error.message : fallback });
+    }
+  };
+
+  const openDeposit = (goalId: string) =>
+    router.push({ pathname: '/add-goal-activity', params: { goalId } });
+  const openEditDeposit = (deposit: GoalActivityView) =>
+    router.push({
+      pathname: '/add-goal-activity',
+      params: { goalId: deposit.goalId, activityId: deposit.id },
+    });
+  const openNewGoal = (preset?: 'challenge') =>
+    router.push(
+      preset
+        ? { pathname: '/add-savings-goal', params: { preset } }
+        : { pathname: '/add-savings-goal' }
+    );
+  const openEditGoal = (goalId: string) =>
+    router.push({ pathname: '/add-savings-goal', params: { goalId } });
+  const planPayment = (goal: GoalView) =>
+    router.push({
+      pathname: '/plan-payment',
+      params: {
+        targetType: 'savings_goal',
+        targetId: goal.id,
+        // Older builds of the dialog read kind / id.
+        kind: 'savings_goal',
+        id: goal.id,
+        ...((goal.suggestedCents ?? goal.plannedDepositCents)
+          ? { amount: String(goal.suggestedCents ?? goal.plannedDepositCents) }
+          : {}),
+      },
+    });
+
+  const renderGoal = (goal: GoalView) => {
+    const expanded = expandedId === goal.id;
+    return (
+      <GoalCard
+        title={goal.title}
+        category={goal.category}
+        savedCents={goal.savedCents}
+        targetCents={goal.targetCents}
+        percent={goal.percent}
+        isComplete={goal.isComplete}
+        remainingCents={goal.remainingCents}
+        status={STATUS_LABEL[goal.status]}
+        ringColor={goal.color}
+        expanded={expanded}
+        onToggleExpanded={() => toggle(goal.id)}
+        details={
+          <GoalDetails
+            goal={goal}
+            designSchema={data.capabilities.goalDesign}
+            errorMessage={actionError?.id === goal.id ? actionError.message : null}
+            onPlanPayment={() => planPayment(goal)}
+            onEdit={() => openEditGoal(goal.id)}
+            onTogglePause={() =>
+              run(
+                goal.id,
+                () => data.setGoalPaused(goal.id, !goal.isPaused),
+                'Could not update that goal.'
+              )
+            }
+            onDelete={() =>
+              run(goal.id, () => data.deleteGoal(goal.id), 'Could not delete that goal.')
+            }
+            onEditDeposit={openEditDeposit}
+            onDeleteDeposit={(deposit) =>
+              run(goal.id, () => data.deleteDeposit(deposit.id), 'Could not delete that entry.')
+            }
+          />
+        }
+        actions={
+          <>
+            <Button
+              label={expanded ? 'Hide Details' : 'View Details'}
+              variant="outline"
+              shape="rounded"
+              size="sm"
+              style={{ flexGrow: 1, flexBasis: 110 }}
+              onPress={() => toggle(goal.id)}
+              aria-expanded={expanded}
+              accessibilityLabel={`${expanded ? 'Hide' : 'View'} details for ${goal.title}`}
+            />
+            <Button
+              label="Add Deposit"
+              shape="rounded"
+              size="sm"
+              style={{ flexGrow: 1, flexBasis: 110 }}
+              onPress={() => openDeposit(goal.id)}
+              accessibilityLabel={`Add deposit to ${goal.title}`}
+            />
+          </>
+        }
+      />
+    );
+  };
+
+  const renderChallenge = (challenge: ChallengeView) => {
+    const cardKey = `challenge-${challenge.goalId}`;
+    const expanded = expandedId === cardKey;
+    return (
+      <GoalCard
+        title={challenge.title}
+        category={`Block ${challenge.blocksDone} of ${challenge.blocks.length}`}
+        savedLabel="Saved so far"
+        savedCents={challenge.savedCents}
+        targetCents={challenge.targetCents}
+        percent={challenge.percent}
+        isComplete={challenge.weeksDone >= challenge.totalWeeks}
+        status={undefined}
+        ringColor={challenge.color}
+        expanded={expanded}
+        onToggleExpanded={() => toggle(cardKey)}
+        details={
+          <View style={{ gap: Space[3] }}>
+            <View style={{ height: 1, backgroundColor: theme.border }} />
+            <View style={{ gap: Space[1] }}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Week {challenge.currentWeek} of {challenge.totalWeeks} ·{' '}
+                {challenge.cadence === 'biweekly' ? 'Biweekly' : 'Weekly'} deposits
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Start {shortDate(challenge.startDate)} · Ends {shortDate(challenge.endDate)}
+              </ThemedText>
+              <ThemedText type="smallBold" style={{ color: theme.solidAccent }}>
+                {challenge.blocksDone} of {challenge.blocks.length} blocks completed
+              </ThemedText>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[2] }}>
+              <Button
+                label="Edit Challenge"
+                variant="soft"
+                size="sm"
+                shape="rounded"
+                onPress={() => openEditGoal(challenge.goalId)}
+              />
+            </View>
+          </View>
+        }
+        actions={
+          <Button
+            label="View Details"
+            shape="rounded"
+            size="sm"
+            style={{ flexGrow: 1 }}
+            onPress={() =>
+              router.push({ pathname: '/savings-challenge', params: { goalId: challenge.goalId } })
+            }
+            accessibilityLabel={`View details for ${challenge.title}`}
+          />
+        }
+      />
+    );
+  };
+
+  const { summary, monthly } = data;
+  const goalCards = [
+    ...data.challenges.map((challenge) => renderChallenge(challenge)),
+    ...data.goals.map((goal) => renderGoal(goal)),
+  ];
+  const hasNoGoals = data.goals.length === 0 && data.challenges.length === 0;
+  const anyBehind = data.goals.some((g) => g.status === 'behind');
+
+  const monthlyValue = formatMoney(Math.max(monthly.thisMonthCents, 0));
+  const monthlyNote =
+    monthly.thisMonthCents <= 0
+      ? 'No deposits yet this month'
+      : monthly.percentChange !== null
+        ? `${monthly.percentChange >= 0 ? '+' : ''}${monthly.percentChange}% vs last month`
+        : 'Deposits so far this month';
+
   return (
-    <Card style={{ flex: 1, gap: Spacing.half }}>
-      <ThemedText type="smallBold">{title}</ThemedText>
-      {result ? (
-        <>
-          <ThemedText type="small">{result.months} months</ThemedText>
+    <Screen showGuestBanner>
+      <PageHeader
+        title="Savings & Goals"
+        subtitle="Track your savings, build better habits, and reach your goals."
+        backLink={{ label: 'Back to Dashboard', href: '/' }}
+        right={
+          <Button
+            label="+ New Goal"
+            size="sm"
+            shape="rounded"
+            onPress={() => openNewGoal()}
+            accessibilityLabel="New savings goal"
+          />
+        }
+      />
+
+      {data.errorMessage ? (
+        <Card style={{ gap: Space[2] }}>
+          <ThemedText type="smallBold">We couldn&rsquo;t load all of your savings</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {formatCents(result.totalInterestCents)} interest
+            {data.errorMessage}
           </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Debt-free {result.payoffDate}
+          <Button label="Try again" variant="outline" size="sm" onPress={() => void refresh()} />
+        </Card>
+      ) : null}
+
+      {data.freshBadges.length > 0 ? (
+        <Card
+          accessibilityLiveRegion="polite"
+          style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[4] }}
+        >
+          <Image
+            source={BrandAssets.mascotTransparent}
+            style={{ width: 72, height: 72 }}
+            contentFit="contain"
+            accessibilityLabel=""
+          />
+          <View style={{ flexShrink: 1, gap: Space[1] }}>
+            <ThemedText type="subtitle">
+              {data.freshBadges.length === 1
+                ? 'You earned a new badge!'
+                : `You earned ${data.freshBadges.length} new badges!`}
+            </ThemedText>
+            <ThemedText themeColor="textSecondary">
+              {data.freshBadges.map((b) => b.name).join(', ')} — nice work. Keep it going.
+            </ThemedText>
+          </View>
+        </Card>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[5] }}>
+        <TotalSavedCard
+          totalCents={summary.totalSavedCents}
+          note={
+            summary.totalSavedCents === 0
+              ? 'Your first deposit will show up here.'
+              : anyBehind
+                ? 'Every deposit gets you closer.'
+                : "You're building momentum. Keep it up."
+          }
+        />
+        <StatCard
+          label="Monthly savings"
+          value={monthlyValue}
+          description={monthlyNote}
+          valueColor={monthly.thisMonthCents > 0 ? 'text' : 'disabled'}
+        />
+        <StatCard
+          label="Badges earned"
+          value={`${data.badgesEarnedCount} ${data.badgesEarnedCount === 1 ? 'Badge' : 'Badges'}`}
+          description={
+            data.badgesEarnedCount > 0
+              ? 'Great progress — keep going!'
+              : 'Keep saving to unlock more.'
+          }
+        />
+      </View>
+
+      <Card style={{ gap: Space[4], borderRadius: Radius.hero }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[3] }}>
+          <View
+            accessibilityElementsHidden
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: Radius.input,
+              backgroundColor: theme.backgroundSelected,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                borderWidth: 2,
+                borderColor: theme.solidAccent,
+              }}
+            />
+          </View>
+          <ThemedText
+            accessibilityRole="header"
+            style={{ fontFamily: Fonts.heading.semibold, fontSize: 18 }}
+          >
+            Savings Summary
           </ThemedText>
-        </>
-      ) : (
-        <ThemedText type="small" themeColor="textSecondary">
-          —
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[4] }}>
+          <SummaryItem label="Total savings" value={formatMoney(summary.totalSavedCents)} />
+          <SummaryItem
+            label="52-week total"
+            value={formatMoney(summary.challengeSavedCents)}
+            color={theme.solidAccent}
+          />
+          <SummaryItem label="Emergency goals" value={formatMoney(summary.emergencySavedCents)} />
+          <SummaryItem label="Active goals" value={String(summary.activeGoalCount)} />
+          <SummaryItem
+            label="Completed"
+            value={String(summary.completedGoalCount)}
+            color={theme.success}
+          />
+          <SummaryItem
+            label="Badges"
+            value={String(data.badgesEarnedCount)}
+            color={theme.primary}
+          />
+        </View>
+      </Card>
+
+      <View style={{ gap: Space[4] }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: Space[3],
+          }}
+        >
+          <ThemedText
+            accessibilityRole="header"
+            style={{ fontFamily: Fonts.heading.semibold, fontSize: 18 }}
+          >
+            Active Savings Goals
+          </ThemedText>
+          {data.challenges.length === 0 && !hasNoGoals ? (
+            <Button
+              label="Start a 52-week challenge"
+              variant="quiet"
+              size="sm"
+              onPress={() => openNewGoal('challenge')}
+            />
+          ) : null}
+        </View>
+        {hasNoGoals && !data.isLoading ? (
+          <EmptyState
+            title="No savings goals yet"
+            message="Set a goal for something you care about, or try the 52-week challenge — small, steady deposits add up."
+            action={
+              <View style={{ gap: Space[2] }}>
+                <Button label="+ New Goal" variant="panel" onPress={() => openNewGoal()} />
+                <Button
+                  label="Start a 52-week challenge"
+                  variant="outline"
+                  onPress={() => openNewGoal('challenge')}
+                />
+              </View>
+            }
+          />
+        ) : goalCards.length > 0 ? (
+          <CardGrid>{goalCards}</CardGrid>
+        ) : (
+          <ThemedText themeColor="textSecondary">Loading your goals…</ThemedText>
+        )}
+      </View>
+
+      <ActivitySection activity={data.activity} />
+
+      <SectionCard
+        title="Badge Earnings"
+        action={
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            {data.badgesEarnedCount} unlocked
+          </ThemedText>
+        }
+      >
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space[3] }}>
+          {data.badges.map((badge) => (
+            <BadgeTile
+              key={badge.id}
+              badge={badge}
+              expanded={openBadgeId === badge.id}
+              onToggle={() => setOpenBadgeId((current) => (current === badge.id ? null : badge.id))}
+            />
+          ))}
+        </View>
+      </SectionCard>
+
+      <SectionCard title="Budget missions">
+        <View style={{ gap: Space[5] }}>
+          {data.missions.map((mission) => (
+            <MissionRow
+              key={mission.id}
+              mission={mission}
+              onComplete={() => data.markMissionComplete(mission.id)}
+            />
+          ))}
+        </View>
+      </SectionCard>
+    </Screen>
+  );
+}
+
+function shortDate(iso: string) {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** The hero stat: Total Saved on a Panel-to-teal gradient with a $ tile, white text throughout. */
+function TotalSavedCard({ totalCents, note }: { totalCents: number; note: string }) {
+  return (
+    <View style={{ flexGrow: 1, flexBasis: 240, borderRadius: Radius.hero, overflow: 'hidden' }}>
+      <LinearGradient
+        colors={[Brand.panel, '#00758F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ padding: Space[7], gap: Space[3], minHeight: 168, justifyContent: 'center' }}
+      >
+        <View
+          accessibilityElementsHidden
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: Radius.input,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ThemedText style={{ color: '#FFFFFF', fontFamily: Fonts.body.bold, fontSize: 18 }}>
+            $
+          </ThemedText>
+        </View>
+        <ThemedText type="eyebrow" style={{ color: '#FFFFFF', fontSize: 12 }}>
+          Total saved
         </ThemedText>
-      )}
-    </Card>
+        <ThemedText
+          style={{
+            color: '#FFFFFF',
+            fontFamily: Fonts.heading.bold,
+            fontSize: 32,
+            lineHeight: 40,
+            letterSpacing: -0.32,
+          }}
+        >
+          {formatMoney(totalCents)}
+        </ThemedText>
+        <ThemedText type="small" style={{ color: '#FFFFFF' }}>
+          {note}
+        </ThemedText>
+      </LinearGradient>
+    </View>
+  );
+}
+
+function SummaryItem({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={{ flexGrow: 1, flexBasis: 110, gap: Space[1] }}>
+      <ThemedText
+        type="eyebrow"
+        themeColor="textSecondary"
+        style={{ fontSize: 11, letterSpacing: 0.8 }}
+      >
+        {label}
+      </ThemedText>
+      <ThemedText
+        style={{
+          fontFamily: Fonts.heading.semibold,
+          fontSize: 24,
+          lineHeight: 30,
+          ...(color ? { color } : {}),
+        }}
+      >
+        {value}
+      </ThemedText>
+    </View>
   );
 }
