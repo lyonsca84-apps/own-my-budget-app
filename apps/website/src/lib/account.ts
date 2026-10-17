@@ -39,10 +39,22 @@ export async function getSession(): Promise<Session | null> {
   return data.session;
 }
 
-export async function loadAccount(session: Session): Promise<CurrentAccount> {
+/**
+ * Loads profile, settings and plan. Retries a couple of times because the very
+ * first request after signing in (e.g. straight back from Google) can be
+ * rejected with a 401 while the brand-new token settles.
+ */
+export async function loadAccount(session: Session, attempts = 3): Promise<CurrentAccount> {
   const supabase = getClient();
   if (!supabase) throw new Error('Supabase is not configured.');
-  return getCurrentAccount(supabase, session.user.id);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await getCurrentAccount(supabase, session.user.id);
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+    }
+  }
 }
 
 export type Entitlement = CurrentAccount['entitlement'];
