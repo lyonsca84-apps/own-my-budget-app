@@ -235,7 +235,7 @@ export function TourCoach() {
   return (
     <View
       aria-label="Budget Buddy guided tour"
-      style={[dock, panelStyle, { maxHeight: isWide ? '72%' : '62%' }]}
+      style={[dock, panelStyle, { maxHeight: isWide ? '56%' : '50%' }]}
     >
       <ScrollView contentContainerStyle={{ padding: Space[5], gap: Space[4] }}>
         {/* Progress, title and controls */}

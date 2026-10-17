@@ -80,8 +80,14 @@ function sectionHref(section: TourSection): Href {
 
 /** Leaves any open form/modal, then opens the section's real tab or screen. */
 function openSection(section: TourSection) {
-  if (router.canDismiss()) router.dismissAll();
-  router.navigate(sectionHref(section));
+  const href = sectionHref(section);
+  if (router.canDismiss()) {
+    // Let the modal close before switching tabs, or the tab switch is lost.
+    router.dismissAll();
+    setTimeout(() => router.navigate(href), 60);
+  } else {
+    router.navigate(href);
+  }
 }
 
 async function loadCounts(userId: string): Promise<TourCounts> {
