@@ -36,7 +36,9 @@ import { DateField } from '@/components/ui/date-field';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
+import { BuddyMascot } from '@/components/tour/buddy-mascot';
 import { useAuth } from '@/contexts/auth-context';
+import { useTour } from '@/contexts/tour-context';
 import { BrandAssets } from '@/design-system/assets/brand';
 import { Layout, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -116,6 +118,7 @@ function describeEntered(draft: OnboardingIncomeDraft): string {
  */
 export default function OnboardingScreen() {
   const { user, completeOnboarding } = useAuth();
+  const tour = useTour();
   const today = useMemo(() => new Date(), []);
 
   const [step, setStep] = useState<StepId>('welcome');
@@ -281,13 +284,15 @@ export default function OnboardingScreen() {
     goTo('review');
   }
 
-  async function handleDoLater() {
+  /** "Explore on my own" skips the tour (it stays in Settings); "Do this later" offers it on the Dashboard. */
+  async function handleDoLater(choice: 'explore' | 'later') {
     if (saveInFlight.current || !draftLoaded) return;
     saveInFlight.current = true;
     setIsBusy(true);
     setErrorMessage(null);
     try {
       await clearDraft();
+      await tour.setFromOnboarding(choice);
       await completeOnboarding();
     } catch {
       setErrorMessage('We couldn’t reach your account just now. Please try again.');
@@ -355,12 +360,14 @@ export default function OnboardingScreen() {
     }
   }
 
-  async function handleGoToDashboard() {
+  /** From the finish screen: continue into Budget Buddy's tour, or go straight to the dashboard. */
+  async function handleGoToDashboard(withTour: boolean) {
     if (saveInFlight.current) return;
     saveInFlight.current = true;
     setIsBusy(true);
     try {
       await clearDraft();
+      await tour.setFromOnboarding(withTour ? 'guided' : 'later');
       await completeOnboarding();
     } catch {
       setErrorMessage('We couldn’t open your dashboard just now. Please try again.');
@@ -432,13 +439,17 @@ export default function OnboardingScreen() {
             <ThemedText type="title" style={{ textAlign: 'center' }} accessibilityRole="header">
               Welcome to Own My Budget
             </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[3] }}>
+              <BuddyMascot mood="speaking" size={80} />
+              <ThemedText style={{ flex: 1, maxWidth: 400 }}>
+                Hi, I&rsquo;m Budget Buddy! I&rsquo;ll take you through the app one section at a
+                time and help you set up the numbers you choose to add. It&rsquo;s not a test, and
+                you can skip anything.
+              </ThemedText>
+            </View>
             <ThemedText themeColor="textSecondary" style={{ textAlign: 'center', maxWidth: 460 }}>
-              Answer a few quick questions and we&rsquo;ll set up a starting dashboard for you. It
-              takes about two minutes.
-            </ThemedText>
-            <ThemedText themeColor="textSecondary" style={{ textAlign: 'center', maxWidth: 460 }}>
-              You can skip anything. Bills, debts, and savings can be added later, whenever
-              you&rsquo;re ready.
+              First a few quick questions about you and your take-home pay, then a short tour of
+              your real dashboard, budget, bills, cards, loans and savings.
             </ThemedText>
           </View>
           <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
@@ -447,17 +458,26 @@ export default function OnboardingScreen() {
           </ThemedText>
           <View style={{ gap: Space[3], alignSelf: 'stretch' }}>
             <Button
-              label="Get started"
+              label="Start guided setup"
               variant="panel"
               onPress={() => goTo('name')}
               disabled={isBusy}
             />
             <Button
+              label="Explore on my own"
+              variant="outline"
+              onPress={() => handleDoLater('explore')}
+              disabled={isBusy}
+            />
+            <Button
               label="Do this later"
               variant="quiet"
-              onPress={handleDoLater}
+              onPress={() => handleDoLater('later')}
               loading={isBusy}
             />
+            <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
+              You can take the tour anytime from Settings.
+            </ThemedText>
           </View>
           {errorMessage ? (
             <ThemedText
@@ -804,11 +824,7 @@ export default function OnboardingScreen() {
 
       {step === 'done' && (
         <View style={{ gap: Space[7], alignItems: 'center', paddingTop: Space[7] }}>
-          <Image
-            source={BrandAssets.mascotTransparent}
-            style={{ width: 140, height: 140 }}
-            contentFit="contain"
-          />
+          <BuddyMascot mood="celebrating" size={140} />
           <View style={{ gap: Space[3], alignItems: 'center' }}>
             <ThemedText type="title" style={{ textAlign: 'center' }} accessibilityRole="header">
               {displayName.trim() ? `Nice work, ${displayName.trim()}!` : 'Nice work!'}
@@ -837,11 +853,22 @@ export default function OnboardingScreen() {
               {errorMessage}
             </ThemedText>
           ) : null}
+          <ThemedText style={{ textAlign: 'center', maxWidth: 460 }}>
+            Next, Budget Buddy can walk you through each part of the app and help you add bills,
+            cards, loans and savings goals, only if you want to.
+          </ThemedText>
+          <Button
+            label="Continue with the tour"
+            variant="panel"
+            onPress={() => handleGoToDashboard(true)}
+            loading={isBusy}
+            style={{ alignSelf: 'stretch' }}
+          />
           <Button
             label="Go to my dashboard"
-            variant="panel"
-            onPress={handleGoToDashboard}
-            loading={isBusy}
+            variant="quiet"
+            onPress={() => handleGoToDashboard(false)}
+            disabled={isBusy}
             style={{ alignSelf: 'stretch' }}
           />
         </View>
@@ -864,11 +891,7 @@ function StepBody({
   return (
     <View style={{ gap: Space[5] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[3] }}>
-        <Image
-          source={BrandAssets.mascotTransparent}
-          style={{ width: 72, height: 72 }}
-          contentFit="contain"
-        />
+        <BuddyMascot mood="listening" size={72} />
         <View
           style={{
             flex: 1,

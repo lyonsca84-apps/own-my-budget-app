@@ -12,6 +12,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
+import { useTour } from '@/contexts/tour-context';
 import { supabase } from '@/lib/supabase';
 import { NAV_ITEMS, WIDE_EXTRA_LINKS } from '@/constants/nav';
 import { Brand, Fonts, Layout, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -63,6 +64,17 @@ export default function AppTabs() {
   const closeHelper = useCallback(() => setHelperOpen(false), []);
   const panelOpen = isWide && helperOpen;
 
+  // Budget Buddy's tour spotlights the tab it's explaining. On narrow screens
+  // Grocery and Reports live under More, so More is highlighted instead.
+  const tour = useTour();
+  const tourTarget = tour.state.status === 'active' ? tour.section.navTarget : null;
+  const spotlightName =
+    !isWide && (tourTarget === 'grocery' || tourTarget === 'reports') ? 'more' : tourTarget;
+  const EXTRA_TARGETS: Record<string, string> = {
+    '/grocery-list': 'grocery',
+    '/reports': 'reports',
+  };
+
   return (
     <Tabs style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
       {/* TabList must be a direct child of Tabs — the navigator statically
@@ -77,12 +89,18 @@ export default function AppTabs() {
                 label={isWide ? item.wideLabel : item.narrowLabel}
                 isWide={isWide}
                 hidden={isWide && item.hideOnWide}
+                spotlight={spotlightName === item.name}
               />
             </TabTrigger>
           ))}
           {isWide &&
             WIDE_EXTRA_LINKS.map((link) => (
-              <ExtraNavLink key={link.href as string} label={link.label} href={link.href} />
+              <ExtraNavLink
+                key={link.href as string}
+                label={link.label}
+                href={link.href}
+                spotlight={spotlightName === EXTRA_TARGETS[link.href as string]}
+              />
             ))}
         </NavListChrome>
       </TabList>
@@ -279,13 +297,23 @@ function BudgetBuddyUpsellCard({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function ExtraNavLink({ label, href }: { label: string; href: Href }) {
+function ExtraNavLink({
+  label,
+  href,
+  spotlight,
+}: {
+  label: string;
+  href: Href;
+  spotlight?: boolean;
+}) {
+  const theme = useTheme();
   return (
     <Pressable
       accessibilityRole="link"
-      accessibilityLabel={label}
+      accessibilityLabel={spotlight ? `${label}. Budget Buddy's tour is here.` : label}
       onPress={() => router.push(href)}
       style={{
+        ...spotlightStyle(spotlight, theme.sun),
         borderRadius: Radius.input,
         paddingVertical: Spacing.two,
         paddingHorizontal: Spacing.three,
@@ -306,20 +334,29 @@ function ExtraNavLink({ label, href }: { label: string; href: Href }) {
   );
 }
 
+/** Budget Buddy's tour coach mark: a Sun outline around the tab the tour is explaining. */
+function spotlightStyle(on: boolean | undefined, color: string): ViewStyle {
+  return { borderWidth: 2, borderColor: on ? color : 'transparent' };
+}
+
 export function NavButton({
   label,
   isWide,
   isFocused,
   hidden,
+  spotlight,
   ...props
 }: {
   label: string;
   isWide: boolean;
   hidden?: boolean;
+  /** Highlighted by Budget Buddy's guided tour. */
+  spotlight?: boolean;
 } & Omit<TabTriggerSlotProps, 'children'>) {
   const theme = useTheme();
 
   if (hidden) return null;
+  const a11yLabel = spotlight ? `${label}. Budget Buddy's tour is here.` : label;
 
   if (isWide) {
     return (
@@ -327,8 +364,9 @@ export function NavButton({
         {...(props as ComponentProps<typeof Pressable>)}
         accessibilityRole="tab"
         accessibilityState={{ selected: isFocused }}
-        accessibilityLabel={label}
+        accessibilityLabel={a11yLabel}
         style={{
+          ...spotlightStyle(spotlight, theme.sun),
           borderRadius: Radius.input,
           paddingVertical: Spacing.two,
           paddingHorizontal: Spacing.three,
@@ -366,8 +404,10 @@ export function NavButton({
       {...(props as ComponentProps<typeof Pressable>)}
       accessibilityRole="tab"
       accessibilityState={{ selected: isFocused }}
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel}
       style={{
+        ...spotlightStyle(spotlight, theme.sun),
+        borderRadius: Radius.input,
         alignItems: 'center',
         gap: 2,
         paddingVertical: Spacing.one,

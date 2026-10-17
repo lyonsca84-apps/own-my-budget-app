@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { formatCentsCompact } from '@own-my-budget/core';
@@ -33,7 +33,14 @@ const MONTH_OPTIONS = MONTH_NAMES.map((name, index) => ({ value: String(index), 
 export default function BudgetScreen() {
   const theme = useTheme();
   const data = useBudgetData();
-  const [mode, setMode] = useState<BudgetMode>('monthly');
+  // `?view=paycheck|monthly` lets Budget Buddy's tour open the right view.
+  const { view } = useLocalSearchParams<{ view?: string }>();
+  const [mode, setMode] = useState<BudgetMode>(view === 'paycheck' ? 'paycheck' : 'monthly');
+  const [lastView, setLastView] = useState(view);
+  if (view !== lastView) {
+    setLastView(view);
+    if (view === 'paycheck' || view === 'monthly') setMode(view);
+  }
 
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();

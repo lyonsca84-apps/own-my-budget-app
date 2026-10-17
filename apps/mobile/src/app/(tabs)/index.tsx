@@ -132,9 +132,14 @@ export default function DashboardScreen() {
                 glyphTint: 'primaryMuted',
                 note: model.setupMissing.includes('income')
                   ? { text: 'Add income to see this amount', tone: 'neutral' }
-                  : model.setupMissing.includes('bills')
-                    ? { text: 'Based on what you’ve added so far', tone: 'neutral' }
-                    : model.available.change,
+                  : model.available.cents === model.income.cents
+                    ? {
+                        text: 'Same as your income for now. Nothing is recorded going out yet.',
+                        tone: 'neutral',
+                      }
+                    : model.setupMissing.includes('bills')
+                      ? { text: 'Based on what you’ve added so far', tone: 'neutral' }
+                      : model.available.change,
                 help: 'Income left after recorded bills, debt, spending and savings. This is not your bank balance.',
               },
             ]}

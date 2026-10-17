@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { SectionCard } from '@/components/ui/section-card';
 import { useAuth } from '@/contexts/auth-context';
+import { useTour } from '@/contexts/tour-context';
 import { Space } from '@/constants/theme';
 
 /**
@@ -18,6 +19,7 @@ import { Space } from '@/constants/theme';
 export default function SettingsScreen() {
   const { status, user, signOut, exitGuestMode } = useAuth();
   const isGuest = status === 'guest';
+  const tour = useTour();
 
   return (
     <Screen>
@@ -67,6 +69,12 @@ export default function SettingsScreen() {
                 label="Help, FAQ & legal"
                 variant="secondary"
                 onPress={() => router.push('/help-legal')}
+              />
+              <Button
+                label="Take the tour again"
+                variant="secondary"
+                accessibilityLabel="Take Budget Buddy's guided tour again. Your saved budget stays as it is."
+                onPress={() => tour.start({ replay: true })}
               />
             </View>
           </SectionCard>

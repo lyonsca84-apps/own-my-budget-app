@@ -1,9 +1,11 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { TourCoach } from '@/components/tour/tour-coach';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { TourProvider } from '@/contexts/tour-context';
 import { Colors, Layout } from '@/constants/theme';
 import { useBrandFonts } from '@/design-system/use-brand-fonts';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,8 +39,14 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navigationTheme}>
       <AuthProvider>
-        <AnimatedSplashOverlay />
-        <RootNavigator />
+        <TourProvider>
+          <View style={{ flex: 1 }}>
+            <AnimatedSplashOverlay />
+            <RootNavigator />
+            {/* Budget Buddy's guided tour docks above whichever real screen is open. */}
+            <TourCoach />
+          </View>
+        </TourProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -10,6 +10,7 @@ export * from './savings';
 export * from './dashboard';
 export * from './onboarding';
 export * from './onboarding-draft';
+export * from './tour';
 export * from './featureGate';
 export * from './features/receiptScans';
 export * from './features/pantryScans';
