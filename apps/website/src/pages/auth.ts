@@ -117,8 +117,34 @@ function blockIfNotConfigured(): boolean {
     note.textContent = NOT_CONFIGURED_MESSAGE;
     note.hidden = false;
   }
-  for (const b of document.querySelectorAll<HTMLButtonElement>('form button[type="submit"]')) b.disabled = true;
+  for (const b of document.querySelectorAll<HTMLButtonElement>('form button[type="submit"], [data-oauth]')) b.disabled = true;
   return true;
+}
+
+/**
+ * "Continue with Google": the same Supabase Google provider the app uses. Google
+ * sends people back to this page, which then moves them on (see destination()).
+ */
+function wireGoogle(): void {
+  const button = $('[data-oauth="google"]') as HTMLButtonElement | null;
+  if (!button || !supabase) return;
+  button.addEventListener('click', async () => {
+    showAlert(null);
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    const back = new URL(window.location.pathname, window.location.origin);
+    if (intent) back.search = intentQuery(intent);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: back.toString() },
+    });
+    // On success the browser is already leaving for Google.
+    if (error) {
+      showAlert('We couldn’t start Google sign-in. Please try again, or use your email instead.');
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  });
 }
 
 async function initSignupOrLogin(isSignup: boolean): Promise<void> {
@@ -128,11 +154,20 @@ async function initSignupOrLogin(isSignup: boolean): Promise<void> {
     if (note) note.hidden = false;
   }
   if (blockIfNotConfigured() || !supabase) return;
-  // Already signed in (or just returned from the confirmation email): skip ahead.
+  // Already signed in (or just returned from the confirmation email or Google): skip ahead.
   if (await getSession()) {
     window.location.replace(destination());
     return;
   }
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('error') || params.has('error_description')) {
+    showAlert(
+      params.get('error') === 'access_denied'
+        ? 'Google sign-in was canceled. You can try again, or use your email instead.'
+        : 'We couldn’t sign you in with Google. Please try again, or use your email instead.'
+    );
+  }
+  wireGoogle();
   const form = $('#auth-form') as HTMLFormElement | null;
   if (!form) return;
   const idleLabel = isSignup ? 'Continue' : 'Log in';

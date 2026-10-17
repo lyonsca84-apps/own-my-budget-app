@@ -87,6 +87,8 @@ button { font-family: inherit; }
 .btn-outline { background: #FFFFFF; color: #0E2C52; }
 .btn-outline:hover { background: #F2F5F4; }
 .btn[disabled], .btn[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
+.auth-divider { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #56657C; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #DCE3EA; }
 .notice { padding: 14px 16px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
 .notice-info { background: #EAF1FB; color: #12385F; }
 .notice-warn { background: #FDF0E3; color: #7A3D07; }
