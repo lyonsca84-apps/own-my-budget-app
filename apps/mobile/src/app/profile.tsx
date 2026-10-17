@@ -79,9 +79,14 @@ export default function ProfileScreen() {
 
   const trimmed = name.trim();
   const canSave = !isSaving && !loadError && trimmed.length > 0 && trimmed !== savedName;
-  const providers =
-    (user?.app_metadata?.providers as string[] | undefined) ??
-    (user?.app_metadata?.provider ? [user.app_metadata.provider as string] : []);
+  // Linked identities are the source of truth for how this account can sign in.
+  const providers = Array.from(
+    new Set(
+      (user?.identities ?? []).map((identity) => identity.provider).length > 0
+        ? (user?.identities ?? []).map((identity) => identity.provider)
+        : ((user?.app_metadata?.providers as string[] | undefined) ?? [])
+    )
+  );
 
   async function handleSave() {
     if (!user || !canSave) return;
