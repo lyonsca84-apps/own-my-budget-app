@@ -130,16 +130,19 @@ export function NavListChrome({
     <View
       style={
         isWide
-          ? {
+          ? ({
               width: Layout.sidebarWidth,
               flexShrink: 0,
+              // Short windows scroll the sidebar itself, never the whole page
+              // (a page scroll would also misplace Budget Buddy's tour spotlight).
+              overflowY: 'auto',
               backgroundColor: theme.backgroundElement,
               borderRightWidth: 1,
               borderRightColor: theme.border,
               paddingVertical: Spacing.four,
               paddingHorizontal: Spacing.three,
               gap: Spacing.five,
-            }
+            } as ViewStyle)
           : ({
               flexDirection: 'row',
               borderTopWidth: 1,
@@ -257,7 +260,7 @@ function AccountSummary() {
           {name}
         </ThemedText>
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.one }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -Spacing.two }}>
         <Button label="Profile" size="sm" variant="quiet" onPress={() => router.push('/profile')} />
         <Button
           label="Settings"
