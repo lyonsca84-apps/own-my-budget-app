@@ -117,7 +117,7 @@ function describeEntered(draft: OnboardingIncomeDraft): string {
  * Skipped answers are never stored as zeros.
  */
 export default function OnboardingScreen() {
-  const { user, completeOnboarding } = useAuth();
+  const { user, completeOnboarding, signOut } = useAuth();
   const tour = useTour();
   const today = useMemo(() => new Date(), []);
 
@@ -478,6 +478,12 @@ export default function OnboardingScreen() {
             <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
               You can take the tour anytime from Settings.
             </ThemedText>
+            <Button
+              label={user?.email ? `Not ${user.email}? Log out` : 'Log out'}
+              variant="quiet"
+              onPress={() => void signOut()}
+              disabled={isBusy}
+            />
           </View>
           {errorMessage ? (
             <ThemedText
