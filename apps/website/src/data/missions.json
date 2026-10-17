@@ -1,0 +1,131 @@
+[
+  {
+    "age": "14–17",
+    "cat": "First paycheck",
+    "profile": "The teen with a first paycheck",
+    "title": "The $200 Shoes Decision",
+    "scenario": "A teenager wants new sneakers but also needs money for transportation, a phone contribution, and savings.",
+    "steps": [
+      "Start with a fictional $250 paycheck.",
+      "List the expenses that must be covered before the next paycheck.",
+      "See what remains after buying the shoes.",
+      "Compare buying now, choosing a cheaper pair, or saving toward them."
+    ],
+    "goal": "Understand spending tradeoffs and needs versus wants.",
+    "badge": "First Paycheck Planner",
+    "tint": "#9BE7D3"
+  },
+  {
+    "age": "18–24",
+    "cat": "Independent living",
+    "profile": "The young adult starting out",
+    "title": "More Than the Rent",
+    "scenario": "A young adult is preparing to move into their first apartment and has only considered rent.",
+    "steps": [
+      "Review fictional take-home income.",
+      "Add utilities, groceries, transportation, and internet.",
+      "Separate move-in costs from recurring monthly expenses.",
+      "Compare two housing options using the complete budget."
+    ],
+    "goal": "Recognize the full cost of living independently.",
+    "badge": "Real-Life Budget Builder",
+    "tint": "#EAF1FB"
+  },
+  {
+    "age": "25–34",
+    "cat": "Variable income",
+    "profile": "The hourly worker with changing hours",
+    "title": "When the Paycheck Shrinks",
+    "scenario": "An hourly worker receives less pay than expected while regular expenses remain.",
+    "steps": [
+      "Compare the expected and actual fictional paycheck.",
+      "Identify essential expenses and upcoming due dates.",
+      "Adjust flexible spending.",
+      "Spot any remaining shortfall and identify questions to ask the bill provider."
+    ],
+    "goal": "Practice budgeting with income that changes.",
+    "badge": "Flexible Budget Planner",
+    "tint": "#FDF0E3"
+  },
+  {
+    "age": "35–44",
+    "cat": "Family expenses",
+    "profile": "The parent balancing family expenses",
+    "title": "The School Expense Surprise",
+    "scenario": "A parent, including a single-parent household, faces a school expense alongside groceries and household bills.",
+    "steps": [
+      "Add the fictional school expense to the monthly plan.",
+      "Separate required costs from optional extras.",
+      "Compare ways to adjust flexible expenses.",
+      "Create a small future school-expense savings goal."
+    ],
+    "goal": "Plan for irregular family costs without losing sight of essentials.",
+    "badge": "Family Expense Planner",
+    "tint": "#F2F5F4"
+  },
+  {
+    "age": "45–54",
+    "cat": "Debt and priorities",
+    "profile": "The adult juggling debt and daily costs",
+    "title": "The Trip and the Oil Change",
+    "scenario": "An adult has budgeted for a getaway but overlooked routine car maintenance and existing payment obligations.",
+    "steps": [
+      "Add maintenance to the fictional trip budget.",
+      "Review household bills and required debt payments.",
+      "Compare a smaller trip, a later trip, and the original plan.",
+      "See how each choice changes the money remaining."
+    ],
+    "goal": "Include overlooked costs and compare spending priorities.",
+    "badge": "Think-Ahead Planner",
+    "tint": "#9BE7D3"
+  },
+  {
+    "age": "55–60",
+    "cat": "Preparing for change",
+    "profile": "The worker approaching retirement",
+    "title": "A Different Monthly Income",
+    "scenario": "A worker explores a fictional future budget with less monthly income.",
+    "steps": [
+      "Compare two fictional monthly income amounts.",
+      "List essential expenses.",
+      "Review subscriptions and flexible spending.",
+      "Identify costs and income details that still need verification."
+    ],
+    "goal": "Understand how an income change affects a household budget.",
+    "badge": "Next-Chapter Planner",
+    "tint": "#EAF1FB"
+  },
+  {
+    "age": "61–66",
+    "cat": "Monthly income",
+    "profile": "The new retiree on a monthly payment",
+    "title": "Make It Last Until Next Month",
+    "scenario": "A new retiree receives income once a month and needs to plan around bills, groceries, and transportation.",
+    "steps": [
+      "Place fictional income and bill dates on a calendar.",
+      "Reserve money for bills due later in the month.",
+      "Divide flexible spending into weekly amounts.",
+      "Check what remains before the next payment."
+    ],
+    "goal": "Understand payment timing and monthly cash flow.",
+    "badge": "Month Mapper",
+    "tint": "#FDF0E3"
+  },
+  {
+    "age": "67–70",
+    "cat": "Health essentials",
+    "profile": "The older adult balancing medicine and lottery spending",
+    "title": "Medicine Before the Maybe",
+    "scenario": "A 70-year-old on a fixed income discovers that repeated lottery purchases have used money needed for a prescription refill.",
+    "steps": [
+      "Review a fictional monthly income and prescription cost.",
+      "Add up the month’s lottery purchases.",
+      "Build a budget that reserves money for medicine and other essentials first.",
+      "Compare smaller entertainment amounts and see their effect.",
+      "If the fictional budget still falls short, identify who to contact about prescription costs, such as a pharmacist or insurer."
+    ],
+    "goal": "Recognize repeated discretionary spending and protect essential expenses.",
+    "badge": "Essentials Planner",
+    "tint": "#F2F5F4"
+  }
+]

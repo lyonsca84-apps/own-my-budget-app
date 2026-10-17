@@ -1,0 +1,22 @@
+{
+  "name": "@own-my-budget/website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Own My Budget marketing website \u2014 static multi-page Vite site built from the approved Claude website design. Uses the shared Supabase project and Stripe Edge Functions for sign-up, checkout and billing.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@own-my-budget/api": "*",
+    "@own-my-budget/core": "*",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^7.1.0"
+  }
+}

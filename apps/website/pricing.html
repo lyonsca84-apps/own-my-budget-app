@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pricing · Own My Budget</title>
+    <meta name="description" content="Start free. Choose more guidance when you need it. Compare Free, Guided and Budget Buddy plans." />
+    <meta name="theme-color" content="#9BE7D3" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/pages/pricing.ts"></script>
+  </head>
+  <body data-nav="pricing">
+    <div class="page">
+      <!-- @include header -->
+      <main id="main">
+    <section aria-labelledby="pricing-title" style="background: #9BE7D3; padding: clamp(36px, 6vw, 72px) 20px clamp(120px, 12vw, 150px); text-align: center;">
+      <div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+        <h1 id="pricing-title" style="margin: 0; font-size: clamp(38px, 6.4vw, 76px); line-height: 1; font-weight: 800; letter-spacing: -0.04em; text-wrap: balance;">Find your budgeting rhythm.</h1>
+        <p style="margin: 0; font-size: clamp(16px, 1.4vw, 19px); line-height: 1.5; color: #12385F;">Start free. Choose more guidance when you need it.</p>
+        <div role="group" aria-label="Billing period" id="pricing-billing" style="margin-top: 10px; display: flex; padding: 5px; border-radius: 999px; background: #FFFFFF; gap: 4px;">
+          <button type="button" data-billing="monthly" aria-pressed="true" style="min-height: 44px; padding: 0 24px; border: none; border-radius: 999px; background: #0E2C52; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 160ms ease;">Monthly</button>
+          <button type="button" data-billing="yearly" aria-pressed="false" style="min-height: 44px; padding: 0 24px; border: none; border-radius: 999px; background: transparent; color: #0E2C52; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 160ms ease;">Yearly</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="plans" aria-label="Plans" style="margin-top: clamp(-120px, -10vw, -96px); padding: 0 16px; scroll-margin-top: 80px;">
+      <div id="plan-cards" class="plan-grid" style="max-width: 1200px; margin: 0 auto; display: grid; justify-content: center; gap: clamp(14px, 1.6vw, 20px); align-items: stretch;"><noscript>Plans need JavaScript to load. Free is $0, Guided is $5.99/month and Budget Buddy is $9.99/month.</noscript>
+      </div>
+    </section>
+
+    <section aria-labelledby="trial-title" style="padding: clamp(32px, 4vw, 48px) 16px 0;">
+      <div style="max-width: 1200px; margin: 0 auto; border-radius: 28px; background: #F2F5F4; padding: clamp(24px, 3vw, 36px) clamp(24px, 3.4vw, 40px); display: flex; flex-wrap: wrap; align-items: center; gap: clamp(18px, 3vw, 32px);">
+        <span style="width: 72px; height: 72px; border-radius: 20px; background: #FFFFFF; overflow: hidden; flex-shrink: 0;"><img src="/images/mascot.png" alt="" style="width: 100%; height: 100%; object-fit: cover; object-position: 50% 28%; transform: scale(1.5); display: block;" /></span>
+        <div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 6px;">
+          <h2 id="trial-title" style="margin: 0; font-size: clamp(22px, 2.2vw, 28px); font-weight: 700; letter-spacing: -0.02em;">Try a little extra guidance.</h2>
+          <span style="font-size: 16px; color: #3A4A63;">Explore Budget Buddy free for <span data-trial-days>14</span> days.</span>
+          <span style="font-size: 14px; line-height: 1.55; color: #56657C;">You'll add a payment method at checkout. Cancel before the trial ends and you won't be charged, and your account stays on Free.</span>
+        </div>
+        <div style="flex: 0 1 auto; display: flex; flex-direction: column; gap: 8px; min-width: min(100%, 220px);">
+          <a class="hv2" href="/checkout?plan=budgetBuddy&amp;billing=monthly" data-plan="budgetBuddy" style="min-height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 28px; border-radius: 999px; background: #2FC6A4; color: #0E2C52; font-size: 16px; font-weight: 600;">Start free trial</a>
+          <span style="font-size: 12px; color: #56657C; text-align: center;">AI and photo tools have usage limits.</span>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="compare-title" style="padding: clamp(64px, 8vw, 104px) 16px 0;">
+      <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+        <h2 id="compare-title" style="margin: 0; font-size: clamp(28px, 3.2vw, 40px); font-weight: 700; letter-spacing: -0.03em;">Compare plans</h2>
+        <div role="table" aria-label="Plan comparison" style="border-radius: 20px; border: 1px solid #E6EBF2; overflow: hidden;">
+          <div role="row" class="cmp-cols cmp-head" style="position: sticky; top: 70px; display: grid; background: #F7F9FA;  font-weight: 700; z-index: 2;">
+            <span role="columnheader" style="padding: 14px 14px 14px 18px;">Feature</span>
+            <span role="columnheader" style="padding: 14px 4px; text-align: center;">Free</span>
+            <span role="columnheader" style="padding: 14px 4px; text-align: center; background: #E4F6F1;">Guided</span>
+            <span role="columnheader" style="padding: 14px 4px; text-align: center;"><span class="cmp-long">Budget Buddy</span><span class="cmp-short" aria-hidden="true">Buddy</span></span>
+          </div>
+          <div id="compare-rows" role="rowgroup"></div>
+        </div>
+        <span style="font-size: 13px; color: #56657C;">✓ included · — not included. Monthly allowances reset each month. Features and limits may change.</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="faq-title" style="padding: clamp(64px, 8vw, 104px) 16px 0;">
+      <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: clamp(20px, 5vw, 64px); align-items: start;">
+        <h2 id="faq-title" style="margin: 0; font-size: clamp(28px, 3.2vw, 40px); font-weight: 700; letter-spacing: -0.03em;">Questions?</h2>
+        <div style="display: flex; flex-direction: column; border-top: 1px solid #E6EBF2; grid-column: span 1;">
+          <div id="pricing-faqs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Get started" style="padding: clamp(64px, 8vw, 104px) 16px 0;">
+      <div style="max-width: 1200px; margin: 0 auto; border-radius: 32px; background: #0E2C52; padding: clamp(32px, 5vw, 56px); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 8px; flex: 1 1 320px;">
+          <h2 style="margin: 0; font-size: clamp(26px, 3vw, 38px); line-height: 1.1; font-weight: 700; letter-spacing: -0.03em; color: #FFFFFF;">Start where you are.</h2>
+          <span style="font-size: 16px; color: #C7D9EE;">Begin free. Upgrade only if you want more guidance.</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+          <a class="hv5" href="/signup" style="min-height: 52px; display: flex; align-items: center; padding: 0 26px; border-radius: 999px; background: #FFFFFF; color: #0E2C52; font-size: 16px; font-weight: 600;">Start Free</a>
+          <a class="hv6" href="/" style="min-height: 52px; display: flex; align-items: center; padding: 0 22px; border-radius: 999px; border: 1.5px solid #7C93B4; color: #FFFFFF; font-size: 16px; font-weight: 600;">Back to home</a>
+        </div>
+      </div>
+    </section>
+  </main>
+      <!-- @include footer -->
+      <div id="sticky-plans" hidden style="position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 70; padding: 10px 10px 10px 18px; border-radius: 999px; background: #0E2C52; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 18px 40px -16px rgba(14,44,82,0.6);">
+        <span style="font-size: 14px; color: #FFFFFF;">Start free. No card needed.</span>
+        <a href="#plans" style="min-height: 44px; display: flex; align-items: center; padding: 0 20px; border-radius: 999px; background: #2FC6A4; color: #0E2C52; font-size: 14px; font-weight: 600;">See plans</a>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,101 @@
+/* Base rules carried over from the Claude Design <helmet> blocks. Page layout
+   itself stays in the design's inline styles so it matches the approved files. */
+body { margin: 0; background: #FFFFFF; font-family: Poppins, system-ui, sans-serif; -webkit-font-smoothing: antialiased; color: #0E2C52; }
+* { box-sizing: border-box; }
+a { color: #0E2C52; text-decoration: none; }
+a:hover { color: #09203D; }
+:focus-visible { outline: 3px solid #F58220; outline-offset: 2px; border-radius: 6px; }
+html { scroll-behavior: smooth; }
+img { max-width: 100%; }
+button { font-family: inherit; }
+/* Inline `display:flex` would otherwise beat the hidden attribute. */
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  html { scroll-behavior: auto; }
+}
+
+.page { overflow-x: hidden; }
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 10px 16px; border-radius: 999px; background: #0E2C52; color: #FFFFFF; font-weight: 600; }
+.skip-link:focus { top: 12px; color: #FFFFFF; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+[id] { scroll-margin-top: 80px; }
+
+/* Header: the design switched nav/burger at 900px via JS; same breakpoint in CSS. */
+.nav-desktop { display: flex; }
+.nav-burger { display: none; }
+#mobile-menu:not([hidden]) { display: flex; }
+@media (max-width: 899px) {
+  .nav-desktop { display: none !important; }
+  .nav-burger { display: flex; }
+}
+.nav-pill { padding: 8px 14px; border-radius: 999px; }
+.nav-pill:hover { background: rgba(255, 255, 255, 0.5); }
+.nav-desktop .nav-pill[aria-current='page'] { background: rgba(255, 255, 255, 0.6); font-weight: 600; }
+#mobile-menu [aria-current='page'] { font-weight: 700; }
+
+/* `style-hover` values from the design, as classes. */
+.hv1:hover { background: #09203D !important; color: #FFFFFF !important; }
+.hv2:hover { background: #27B394 !important; color: #0E2C52 !important; }
+.hv3:hover { background: #FFFFFF !important; }
+.hv4:hover { background: #27B394 !important; }
+.hv5:hover { background: #E4F6F1 !important; color: #0E2C52 !important; }
+.hv6:hover { background: #1A3D69 !important; color: #FFFFFF !important; }
+.hv7:hover { background: #F2F5F4 !important; }
+.hv8:hover { background: #09203D !important; }
+
+/* Pricing: 3-up cards from 768px, one centered column below (design breakpoints). */
+.plan-grid { grid-template-columns: minmax(0, 560px); }
+@media (min-width: 768px) { .plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.cmp-cols { grid-template-columns: minmax(0, 2fr) 1fr 1fr 1fr; }
+.cmp-head { font-size: 15px; }
+.cmp-row { font-size: 15px; }
+.cmp-short { display: none; }
+@media (max-width: 899px) {
+  .cmp-cols { grid-template-columns: minmax(0, 1fr) 68px 68px 72px; }
+  .cmp-head { font-size: 12px; }
+  .cmp-row { font-size: 13px; }
+  .cmp-long { display: none; }
+  .cmp-short { display: inline; }
+}
+
+/* Budget Missions carousel: 3.3 / 2.3 / 1.15 cards visible, as in the design. */
+.mission-card { flex: 0 0 calc((100% - 60px) / 3.3); }
+@media (max-width: 1023px) { .mission-card { flex-basis: calc((100% - 40px) / 2.3); } }
+@media (max-width: 639px) { .mission-card { flex-basis: calc((100% - 20px) / 1.15); } }
+.mission-dialog { padding: 16px; border: none; background: transparent; max-width: 592px; width: 100%; max-height: 100vh; }
+.mission-dialog::backdrop { background: rgba(9, 32, 61, 0.55); }
+
+/* FAQ accordions (all pages share one behavior). */
+.faq-toggle svg { transition: transform 180ms ease; }
+.faq-toggle[aria-expanded='true'] svg { transform: rotate(45deg); }
+
+/* Forms (auth + checkout). Extends the design's input/button language. */
+.form-card { width: 100%; max-width: 460px; margin: 0 auto; border-radius: 28px; background: #FFFFFF; padding: clamp(24px, 4vw, 36px); display: flex; flex-direction: column; gap: 18px; box-shadow: 0 30px 60px -36px rgba(14, 44, 82, 0.45); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; }
+.field input { min-height: 52px; padding: 0 16px; border-radius: 14px; border: 1.5px solid #C0CBDB; font: inherit; font-size: 16px; color: #0E2C52; background: #FFFFFF; }
+.field input:focus { border-color: #1C6FE6; outline: none; box-shadow: 0 0 0 3px rgba(28, 111, 230, 0.2); }
+.field input[aria-invalid='true'] { border-color: #C25F0E; }
+.field .hint { font-size: 13px; color: #56657C; }
+.field .error { font-size: 13px; color: #A44C08; font-weight: 500; }
+.btn { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 26px; border-radius: 999px; border: 1.5px solid #0E2C52; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; text-align: center; }
+.btn-primary { background: #0E2C52; color: #FFFFFF; }
+.btn-primary:hover { background: #09203D; color: #FFFFFF; }
+.btn-mint { background: #2FC6A4; border-color: #2FC6A4; color: #0E2C52; }
+.btn-mint:hover { background: #27B394; color: #0E2C52; }
+.btn-outline { background: #FFFFFF; color: #0E2C52; }
+.btn-outline:hover { background: #F2F5F4; }
+.btn[disabled], .btn[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
+.notice { padding: 14px 16px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+.notice-info { background: #EAF1FB; color: #12385F; }
+.notice-warn { background: #FDF0E3; color: #7A3D07; }
+.notice-ok { background: #E4F6F1; color: #1F4B47; }
+.spinner { width: 40px; height: 40px; border-radius: 999px; border: 4px solid #E4F6F1; border-top-color: #2FC6A4; animation: ombspin 900ms linear infinite; }
+@keyframes ombspin { to { transform: rotate(360deg); } }
+
+/* Long-form content pages (about, legal, accessibility). */
+.prose { max-width: 760px; margin: 0 auto; padding: 0 24px; font-size: 17px; line-height: 1.7; color: #3A4A63; }
+.prose h2 { margin: 40px 0 12px; font-size: clamp(24px, 2.6vw, 30px); line-height: 1.15; color: #0E2C52; letter-spacing: -0.02em; }
+.prose a { text-decoration: underline; text-underline-offset: 4px; font-weight: 600; }
+.prose ul { padding-left: 22px; }

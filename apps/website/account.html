@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My account · Own My Budget</title>
+    <meta name="description" content="Your Own My Budget plan, usage and billing." />
+    <meta name="theme-color" content="#9BE7D3" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/pages/account.ts"></script>
+  </head>
+  <body data-nav="account">
+    <div class="page">
+      <!-- @include header -->
+      <main id="main">
+<section style="background: #9BE7D3; padding: clamp(36px, 6vw, 72px) 20px clamp(64px, 8vw, 96px);">
+  <div style="max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <h1 style="margin: 0; font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;">Plan &amp; Billing</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A4A63;" id="account-email"></p>
+  </div>
+</section>
+<section style="padding: 0 20px; margin-top: -48px;">
+  <div style="max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+    <div id="account-loading" class="form-card" role="status" style="max-width: none; align-items: center;"><span class="spinner" aria-hidden="true"></span><span>Loading your plan…</span></div>
+    <div id="account-error" class="notice notice-warn" role="alert" hidden></div>
+    <div id="account-notice" class="notice notice-ok" role="status" hidden></div>
+    <div id="plan-card" class="form-card" hidden style="max-width: none;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #56657C;">Current plan</span>
+      <strong id="plan-name" style="font-size: clamp(26px, 3vw, 32px); font-weight: 800; letter-spacing: -0.02em;"></strong>
+      <span id="plan-detail" style="font-size: 15px; color: #3A4A63;"></span>
+      <span id="plan-renew" style="font-size: 15px; color: #3A4A63;"></span>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+        <button type="button" id="manage-sub" class="btn btn-primary" hidden>Manage subscription</button>
+        <a href="/pricing#plans" id="see-plans" class="btn btn-outline">See paid plans</a>
+      </div>
+      <span id="portal-note" hidden style="font-size: 13px; color: #56657C;">Opens the secure Stripe billing page to update your payment method, see invoices, switch plans or cancel.</span>
+    </div>
+    <div id="usage-card" class="form-card" hidden style="max-width: none;">
+      <strong style="font-size: 18px;">This month's usage</strong>
+      <div id="usage-list" style="display: flex; flex-direction: column; gap: 16px;"></div>
+      <span style="font-size: 13px; color: #56657C;">Monthly allowances reset at the start of each calendar month (UTC).</span>
+    </div>
+    <div class="form-card" id="session-card" hidden style="max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+      <span style="font-size: 15px; color: #3A4A63;">Your budget lives in the Own My Budget app.</span>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a id="open-app" class="btn btn-mint" hidden>Open my budget</a>
+        <button type="button" id="sign-out" class="btn btn-outline">Log out</button>
+      </div>
+    </div>
+  </div>
+</section></main>
+      <!-- @include footer -->
+
+    </div>
+  </body>
+</html>

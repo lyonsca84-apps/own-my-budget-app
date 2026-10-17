@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create your account · Own My Budget</title>
+    <meta name="description" content="Create your free Own My Budget account." />
+    <meta name="theme-color" content="#9BE7D3" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/pages/auth.ts"></script>
+  </head>
+  <body data-nav="account">
+    <div class="page">
+      <!-- @include header -->
+      <main id="main"><section style="background: #9BE7D3; padding: clamp(36px, 6vw, 72px) 20px clamp(64px, 8vw, 96px);"><div class="form-card">
+  <span id="intent-pill" hidden style="align-self: flex-start; padding: 6px 14px; border-radius: 999px; background: #E4F6F1; color: #1A6A5E; font-size: 13px; font-weight: 600;"></span>
+  <h1 style="margin: 0; font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;">Create your account</h1>
+  <p id="intent-note" style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A4A63;">Start free. No credit card needed.</p>
+  <div id="form-alert" class="notice notice-warn" role="alert" hidden></div>
+  <div id="not-configured" class="notice notice-info" hidden></div>
+  <form id="auth-form" novalidate style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required /><span class="error" id="email-error" hidden></span></div>
+    <div class="field"><label for="password">Create a password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required aria-describedby="password-hint" /><span class="hint" id="password-hint">At least 8 characters.</span><span class="error" id="password-error" hidden></span></div>
+    <button type="submit" class="btn btn-primary">Continue</button>
+  </form>
+  <p style="margin: 0; font-size: 15px; text-align: center;">Already have an account? <a id="switch-link" href="/login" style="font-weight: 600; text-decoration: underline; text-underline-offset: 4px;">Log in</a></p>
+  <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #56657C; text-align: center;">By creating an account you agree to the <a href="/terms" style="text-decoration: underline;">Terms</a> and <a href="/privacy" style="text-decoration: underline;">Privacy Policy</a>. Own My Budget is an educational tool, not financial advice.</p>
+</div></section>
+<section id="check-email" hidden style="background: #9BE7D3; padding: clamp(36px, 6vw, 72px) 20px clamp(64px, 8vw, 96px);"><div class="form-card" style="align-items: center; text-align: center;">
+  <img src="/images/mascot.png" alt="" width="96" height="96" style="width: 96px; height: auto; align-self: center;" />
+  <h1 style="margin: 0; font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;">Check your email</h1>
+  <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A4A63;">We sent a confirmation link to <strong id="sent-to"></strong>. Open it on this device to finish creating your account. We'll keep your plan choice for the next step.</p>
+  <a href="/login" id="check-login" class="btn btn-outline" style="align-self: stretch;">Back to log in</a>
+</div></section></main>
+      <!-- @include footer -->
+
+    </div>
+  </body>
+</html>

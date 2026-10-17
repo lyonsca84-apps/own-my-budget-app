@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Confirming your plan · Own My Budget</title>
+    <meta name="description" content="Your Own My Budget plan is being confirmed." />
+    <meta name="theme-color" content="#9BE7D3" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/pages/checkout.ts"></script>
+  </head>
+  <body data-nav="account">
+    <div class="page">
+      <!-- @include header -->
+      <main id="main"><section style="background: #9BE7D3; padding: clamp(36px, 6vw, 72px) 20px clamp(64px, 8vw, 96px);"><div class="form-card" style="align-items: stretch;">
+  <div id="state-confirming" role="status" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;">
+    <span class="spinner" aria-hidden="true"></span>
+    <h1 style="margin: 0; font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;">Confirming your payment</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A4A63;">This usually takes a moment. You can keep using your budget in the meantime.</p>
+    <a href="/account" data-app-link class="btn btn-outline" style="align-self: stretch;">Go to my account</a>
+  </div>
+  <div id="state-slow" hidden class="notice notice-info">Still confirming. Stripe hasn't told us the payment is complete yet. Your Free access is unchanged, and this page will update by itself. You can also check again from My account in a few minutes.</div>
+  <div id="state-done" hidden role="status" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;">
+    <img src="/images/mascot.png" alt="" width="96" height="96" style="width: 96px; height: auto; align-self: center;" />
+    <h1 style="margin: 0; font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em;">You're all set.</h1>
+    <p id="done-text" style="margin: 0; font-size: 15px; line-height: 1.55; color: #3A4A63;"></p>
+    <a href="/account" id="done-primary" class="btn btn-primary" style="align-self: stretch;">Go to my account</a>
+  </div>
+</div></section></main>
+      <!-- @include footer -->
+
+    </div>
+  </body>
+</html>
