@@ -69,6 +69,10 @@ function friendly(message: string): string {
   if (m.includes('email not confirmed')) return 'Please confirm your email first. Look for the link we sent you.';
   if (m.includes('already registered') || m.includes('already been registered'))
     return 'An account with that email already exists. Try logging in instead.';
+  if (m.includes('email address') && m.includes('invalid'))
+    return 'That email address can’t be used. Please check it, or try a different one.';
+  if (m.includes('signups not allowed') || m.includes('signup is disabled'))
+    return 'New accounts can’t be created right now. Please try again later.';
   if (m.includes('rate limit') || m.includes('too many'))
     return 'Too many attempts just now. Please wait a minute and try again.';
   if (m.includes('password')) return message;
