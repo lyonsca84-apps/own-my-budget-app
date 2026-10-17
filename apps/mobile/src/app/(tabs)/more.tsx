@@ -11,7 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 const MORE_LINKS: {
   label: string;
   description: string;
-  href: '/grocery-list' | '/reports';
+  href: '/grocery-list' | '/reports' | '/profile' | '/settings';
   glyph: string;
   glyphColor: ThemeColor;
   glyphTint: ThemeColor;
@@ -32,6 +32,22 @@ const MORE_LINKS: {
     glyphColor: 'primary',
     glyphTint: 'primaryMuted',
   },
+  {
+    label: 'Profile',
+    description: 'Your name, sign-in email and sign-in methods.',
+    href: '/profile',
+    glyph: '◉',
+    glyphColor: 'text',
+    glyphTint: 'backgroundSelected',
+  },
+  {
+    label: 'Settings',
+    description: 'Plan & billing, reminders, privacy, security, help and the guided tour.',
+    href: '/settings',
+    glyph: '⚙',
+    glyphColor: 'text',
+    glyphTint: 'backgroundSelected',
+  },
 ];
 
 /**
@@ -44,7 +60,7 @@ export default function MoreScreen() {
 
   return (
     <Screen showGuestBanner>
-      <ScreenHeader title="More" subtitle="Groceries, receipts and reports." />
+      <ScreenHeader title="More" subtitle="Groceries, reports, your profile and settings." />
       <View style={{ gap: Space[3] }}>
         {MORE_LINKS.map((link) => (
           <Pressable

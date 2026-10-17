@@ -55,6 +55,7 @@ export default function RootLayout() {
 /** Every screen pushed on top of the tab shell — all modals with a header. */
 const MODAL_SCREENS: { name: string; title: string }[] = [
   { name: 'settings', title: 'Settings' },
+  { name: 'profile', title: 'Profile' },
   { name: 'add-category', title: 'Add category' },
   { name: 'add-income', title: 'Add income' },
   { name: 'add-transaction', title: 'Add transaction' },

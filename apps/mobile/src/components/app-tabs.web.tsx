@@ -9,6 +9,7 @@ import { getCurrentAccount } from '@own-my-budget/api';
 import { PLAN_PRICING, type PlanTier } from '@own-my-budget/core';
 
 import { Avatar } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
@@ -90,6 +91,7 @@ export default function AppTabs() {
                 isWide={isWide}
                 hidden={isWide && item.hideOnWide}
                 spotlight={spotlightName === item.name}
+                nativeID={`nav-${item.name}`}
               />
             </TabTrigger>
           ))}
@@ -100,6 +102,7 @@ export default function AppTabs() {
                 label={link.label}
                 href={link.href}
                 spotlight={spotlightName === EXTRA_TARGETS[link.href as string]}
+                nativeID={`nav-${EXTRA_TARGETS[link.href as string]}`}
               />
             ))}
         </NavListChrome>
@@ -192,57 +195,79 @@ function AccountSummary() {
   const isGuest = status === 'guest';
   const name = isGuest ? 'Guest Mode' : (user?.email?.split('@')[0] ?? 'Account');
 
-  const actionDescription = isGuest ? 'Demo data — tap to create an account' : 'Tap to log out';
-
-  return (
-    <Pressable
-      onPress={() => {
+  if (isGuest) {
+    return (
+      <Pressable
         // RootNavigator's Stack.Protected guard swaps to (auth) automatically
         // once status changes — no manual navigation needed here.
-        if (isGuest) {
-          exitGuestMode();
-        } else {
-          signOut();
-        }
-      }}
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={`${name}. ${actionDescription}`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.two,
-        padding: Spacing.two,
-        borderRadius: Radius.input,
-        backgroundColor: theme.background,
-        opacity: pressed ? 0.85 : 1,
-      })}
-    >
-      {isGuest ? (
-        // Soft teal-to-green orb, per the design's guest block.
+        onPress={exitGuestMode}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`${name}. Demo data — tap to create an account`}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: Spacing.two,
+          padding: Spacing.two,
+          borderRadius: Radius.input,
+          backgroundColor: theme.background,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        {/* Soft teal-to-green orb, per the design's guest block. */}
         <LinearGradient
           colors={[`${Brand.electricity}66`, `${Brand.ecology}80`]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ width: 32, height: 32, borderRadius: 16 }}
         />
-      ) : (
+        <View style={{ flexShrink: 1 }}>
+          <ThemedText type="smallBold" style={{ fontSize: 14, lineHeight: 18 }}>
+            {name}
+          </ThemedText>
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            style={{ fontSize: 13, lineHeight: 17 }}
+          >
+            Demo data
+          </ThemedText>
+        </View>
+      </Pressable>
+    );
+  }
+
+  // Signed in: who you are, plus separate Profile, Settings and Log out controls.
+  return (
+    <View
+      style={{
+        gap: Spacing.one,
+        padding: Spacing.two,
+        borderRadius: Radius.input,
+        backgroundColor: theme.background,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
         <Avatar name={name} size={32} />
-      )}
-      <View style={{ flexShrink: 1 }}>
-        <ThemedText type="smallBold" style={{ fontSize: 14, lineHeight: 18 }}>
-          {name}
-        </ThemedText>
         <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={{ fontSize: 13, lineHeight: 17 }}
+          type="smallBold"
+          style={{ fontSize: 14, lineHeight: 18, flexShrink: 1 }}
           numberOfLines={1}
         >
-          {isGuest ? 'Demo data' : 'Log out'}
+          {name}
         </ThemedText>
       </View>
-    </Pressable>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.one }}>
+        <Button label="Profile" size="sm" variant="quiet" onPress={() => router.push('/profile')} />
+        <Button
+          label="Settings"
+          size="sm"
+          variant="quiet"
+          onPress={() => router.push('/settings')}
+        />
+        <Button label="Log out" size="sm" variant="quiet" onPress={() => signOut()} />
+      </View>
+    </View>
   );
 }
 
@@ -301,14 +326,17 @@ function ExtraNavLink({
   label,
   href,
   spotlight,
+  nativeID,
 }: {
   label: string;
   href: Href;
   spotlight?: boolean;
+  nativeID?: string;
 }) {
   const theme = useTheme();
   return (
     <Pressable
+      nativeID={nativeID}
       accessibilityRole="link"
       accessibilityLabel={spotlight ? `${label}. Budget Buddy's tour is here.` : label}
       onPress={() => router.push(href)}

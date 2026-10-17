@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -32,7 +32,15 @@ const TABS: { value: BillsSubTab; label: string }[] = [
  */
 export default function BillsScreen() {
   const data = useBillsDebtData();
-  const [tab, setTab] = useState<BillsSubTab>('bills');
+  // `?view=bills|cards|loans|payoff` lets Budget Buddy's tour open the right view.
+  const { view } = useLocalSearchParams<{ view?: string }>();
+  const isView = (v: string | undefined): v is BillsSubTab => TABS.some((t) => t.value === v);
+  const [tab, setTab] = useState<BillsSubTab>(isView(view) ? view : 'bills');
+  const [lastView, setLastView] = useState(view);
+  if (view !== lastView) {
+    setLastView(view);
+    if (isView(view)) setTab(view);
+  }
 
   const addBill = () => router.push('/add-bill');
   const addCard = () => router.push({ pathname: '/add-debt', params: { kind: 'card' } });

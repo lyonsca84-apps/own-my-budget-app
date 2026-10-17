@@ -40,6 +40,10 @@ function mapStripeStatus(status: Stripe.Subscription.Status): {
   }
 }
 
+function billingInterval(interval: string | undefined): 'month' | 'year' | null {
+  return interval === 'month' || interval === 'year' ? interval : null;
+}
+
 async function syncSubscription(
   admin: SupabaseClient,
   subscription: Stripe.Subscription
@@ -69,6 +73,14 @@ async function syncSubscription(
         ? new Date(item.current_period_end * 1000).toISOString()
         : null,
       stripe_customer_id: customerId,
+      // Shown in Settings → Subscription, straight from Stripe's subscription.
+      billing_interval: billingInterval(item?.price?.recurring?.interval),
+      price_amount_cents: item?.price?.unit_amount ?? null,
+      price_currency: item?.price?.currency ?? null,
+      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      cancel_at: subscription.cancel_at
+        ? new Date(subscription.cancel_at * 1000).toISOString()
+        : null,
     })
     .eq('user_id', userId);
   if (error) throw error;
@@ -140,6 +152,11 @@ Deno.serve(async (req: Request) => {
               status: 'active',
               trial_ends_at: null,
               current_period_end: null,
+              billing_interval: null,
+              price_amount_cents: null,
+              price_currency: null,
+              cancel_at_period_end: false,
+              cancel_at: null,
             })
             .eq('user_id', userId);
           if (error) throw error;

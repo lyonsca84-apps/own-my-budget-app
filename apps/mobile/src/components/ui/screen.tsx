@@ -52,7 +52,8 @@ export function Screen({
   );
 
   return (
-    <ThemedView style={{ flex: 1 }}>
+    // `tour-screen` lets Budget Buddy's tour spotlight the visible screen.
+    <ThemedView style={{ flex: 1 }} nativeID="tour-screen">
       <SafeAreaView style={{ flex: 1 }} edges={edges}>
         {showGuestBanner && status === 'guest' ? <GuestBanner /> : null}
         {scroll ? (

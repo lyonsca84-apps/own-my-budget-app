@@ -495,9 +495,14 @@ export type Database = {
       };
       entitlements: {
         Row: {
+          billing_interval: string | null;
+          cancel_at: string | null;
+          cancel_at_period_end: boolean;
           created_at: string;
           current_period_end: string | null;
           plan_tier: string;
+          price_amount_cents: number | null;
+          price_currency: string | null;
           revenuecat_app_user_id: string | null;
           status: string;
           stripe_customer_id: string | null;
@@ -506,9 +511,14 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          billing_interval?: string | null;
+          cancel_at?: string | null;
+          cancel_at_period_end?: boolean;
           created_at?: string;
           current_period_end?: string | null;
           plan_tier?: string;
+          price_amount_cents?: number | null;
+          price_currency?: string | null;
           revenuecat_app_user_id?: string | null;
           status?: string;
           stripe_customer_id?: string | null;
@@ -517,9 +527,14 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          billing_interval?: string | null;
+          cancel_at?: string | null;
+          cancel_at_period_end?: boolean;
           created_at?: string;
           current_period_end?: string | null;
           plan_tier?: string;
+          price_amount_cents?: number | null;
+          price_currency?: string | null;
           revenuecat_app_user_id?: string | null;
           status?: string;
           stripe_customer_id?: string | null;

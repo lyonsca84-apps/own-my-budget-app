@@ -38,35 +38,39 @@ export function TipCard({ tips }: { tips: string[] }) {
 export function MissionsCard({ missions }: { missions: MissionStatus[] }) {
   const theme = useTheme();
   return (
-    <DashCard title="Budget missions" padding={20}>
-      <View style={{ gap: Space[3] }}>
-        {missions.map((mission) => (
-          <View
-            key={mission.id}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel={mission.title}
-            accessibilityValue={{ min: 0, max: 100, now: mission.progress }}
-            style={{ gap: 6 }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Space[3] }}>
-              <ThemedText
-                style={{
-                  fontFamily: Fonts.body.semibold,
-                  fontSize: 14,
-                  lineHeight: 20,
-                  flexShrink: 1,
-                }}
+    <View nativeID="tour-missions">
+      <DashCard title="Budget missions" padding={20}>
+        <View style={{ gap: Space[3] }}>
+          {missions.map((mission) => (
+            <View
+              key={mission.id}
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={mission.title}
+              accessibilityValue={{ min: 0, max: 100, now: mission.progress }}
+              style={{ gap: 6 }}
+            >
+              <View
+                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: Space[3] }}
               >
-                {mission.title}
-              </ThemedText>
-              <Caption bold>{mission.progress}%</Caption>
+                <ThemedText
+                  style={{
+                    fontFamily: Fonts.body.semibold,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    flexShrink: 1,
+                  }}
+                >
+                  {mission.title}
+                </ThemedText>
+                <Caption bold>{mission.progress}%</Caption>
+              </View>
+              <Bar percent={mission.progress} color={theme.accent} height={8} />
             </View>
-            <Bar percent={mission.progress} color={theme.accent} height={8} />
-          </View>
-        ))}
-      </View>
-    </DashCard>
+          ))}
+        </View>
+      </DashCard>
+    </View>
   );
 }
 

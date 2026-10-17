@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -21,64 +21,92 @@ export default function SettingsScreen() {
   const isGuest = status === 'guest';
   const tour = useTour();
 
+  const link = (label: string, href: Href, hint?: string) => (
+    <Button
+      label={label}
+      variant="secondary"
+      accessibilityLabel={hint ? `${label}. ${hint}` : label}
+      onPress={() => router.push(href)}
+    />
+  );
+
   return (
     <Screen>
-      <SectionCard title="Account">
-        <ThemedText>{isGuest ? 'Guest — demo data only' : (user?.email ?? '')}</ThemedText>
-      </SectionCard>
-
       {isGuest ? (
-        <Button
-          label="Create an account"
-          onPress={() => {
-            exitGuestMode();
-            router.replace('/sign-up');
-          }}
-        />
+        <>
+          <SectionCard title="Account">
+            <ThemedText>Guest — demo data only</ThemedText>
+          </SectionCard>
+          <Button
+            label="Create an account"
+            onPress={() => {
+              exitGuestMode();
+              router.replace('/sign-up');
+            }}
+          />
+        </>
       ) : (
         <>
-          <SectionCard title="General">
+          <SectionCard title="Profile & account">
+            <ThemedText>{user?.email ?? ''}</ThemedText>
+            {link('View profile', '/profile', 'Your name, sign-in email and sign-in methods.')}
+          </SectionCard>
+
+          <SectionCard title="Subscription & billing">
+            <ThemedText type="small" themeColor="textSecondary">
+              Your plan, price, renewal date, and Stripe’s secure page to update payment or cancel.
+            </ThemedText>
+            {link('Subscription & billing', '/subscription')}
+          </SectionCard>
+
+          <SectionCard title="Notifications & reminders">
+            {link('Bill reminders', '/notification-settings')}
+          </SectionCard>
+
+          <SectionCard title="Privacy & data">
+            {link(
+              'Data & privacy',
+              '/data-privacy',
+              'What we store, export your data, delete your account.'
+            )}
+          </SectionCard>
+
+          <SectionCard title="Security & access">
             <View style={{ gap: Space[3] }}>
-              <Button
-                label="Subscription & plan"
-                variant="secondary"
-                onPress={() => router.push('/subscription')}
-              />
-              <Button label="Reports" variant="secondary" onPress={() => router.push('/reports')} />
-              <Button
-                label="Notifications"
-                variant="secondary"
-                onPress={() => router.push('/notification-settings')}
-              />
-              <Button
-                label="Manage categories"
-                variant="secondary"
-                onPress={() => router.push('/manage-categories')}
-              />
-              <Button
-                label="Security"
-                variant="secondary"
-                onPress={() => router.push('/security')}
-              />
-              <Button
-                label="Data & privacy"
-                variant="secondary"
-                onPress={() => router.push('/data-privacy')}
-              />
-              <Button
-                label="Help, FAQ & legal"
-                variant="secondary"
-                onPress={() => router.push('/help-legal')}
-              />
-              <Button
-                label="Take the tour again"
-                variant="secondary"
-                accessibilityLabel="Take Budget Buddy's guided tour again. Your saved budget stays as it is."
-                onPress={() => tour.start({ replay: true })}
-              />
+              {link('Password & security', '/security')}
+              <Button label="Log out" variant="outline" onPress={() => signOut()} />
             </View>
           </SectionCard>
-          <Button label="Log out" variant="quiet" onPress={() => signOut()} />
+
+          <SectionCard title="Help & legal">
+            {link(
+              'Help, FAQ & legal',
+              '/help-legal',
+              'Help, the educational disclaimer, Privacy Policy and Terms.'
+            )}
+          </SectionCard>
+
+          <SectionCard title="Budget tools">
+            <View style={{ gap: Space[3] }}>
+              {link('Manage categories', '/manage-categories')}
+              {link('Reports', '/reports')}
+            </View>
+          </SectionCard>
+
+          <SectionCard title="Guided tour">
+            <Button
+              label="Take the tour again"
+              variant="secondary"
+              accessibilityLabel="Take Budget Buddy's guided tour again. Your saved budget stays as it is."
+              onPress={() => tour.start({ replay: true })}
+            />
+          </SectionCard>
+
+          <SectionCard title="Appearance & accessibility">
+            <ThemedText type="small" themeColor="textSecondary">
+              Animations, including Budget Buddy’s, follow your device’s reduce-motion setting.
+            </ThemedText>
+          </SectionCard>
         </>
       )}
     </Screen>

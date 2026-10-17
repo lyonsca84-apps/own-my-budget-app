@@ -44,8 +44,13 @@ export interface TourSection {
   title: string;
   /** Route the tour opens for this section. */
   route: string;
-  /** Params for that route (e.g. which Budget view to show). */
+  /** Params for that route (e.g. which Budget or Bills view to show). */
   routeParams?: Record<string, string>;
+  /**
+   * Element to spotlight besides the tab itself. Defaults to the visible
+   * screen (`tour-screen`); a narrower target is used where one card matters.
+   */
+  contentTarget?: string;
   /** Navigation item to spotlight (NAV_ITEMS name, or an extra sidebar link). */
   navTarget: 'index' | 'plan' | 'bills' | 'money' | 'grocery' | 'reports';
   /** Where to look on screen, in words (the visual spotlight is the nav item). */
@@ -115,8 +120,9 @@ export const TOUR_SECTIONS: TourSection[] = [
     id: 'bills',
     title: 'Monthly bills',
     route: '/bills',
+    routeParams: { view: 'bills' },
     navTarget: 'bills',
-    lookFor: 'The Bills & Debt tab, in the Bills section.',
+    lookFor: 'The Bills & Debt tab, under “Bills.”',
     explanation:
       'Bills are recurring household costs like rent, utilities or your phone. Each bill has an amount, a due date and how often it repeats. Marking a bill paid records money going out.',
     keyClue: {
@@ -135,8 +141,9 @@ export const TOUR_SECTIONS: TourSection[] = [
     id: 'cards',
     title: 'Credit cards',
     route: '/bills',
+    routeParams: { view: 'cards' },
     navTarget: 'bills',
-    lookFor: 'The Bills & Debt tab, in the Credit cards section.',
+    lookFor: 'The Bills & Debt tab, under “Credit Cards.”',
     explanation:
       'A card has a balance (what you owe), a credit limit, an APR, a minimum due and a due day. Payments you record lower the balance. The balance, the amount due and your payments are separate numbers.',
     keyClue: {
@@ -156,8 +163,9 @@ export const TOUR_SECTIONS: TourSection[] = [
     id: 'loans',
     title: 'Loans and mortgage',
     route: '/bills',
+    routeParams: { view: 'loans' },
     navTarget: 'bills',
-    lookFor: 'The Bills & Debt tab, in the Loans section.',
+    lookFor: 'The Bills & Debt tab, under “Loans & Mortgages.”',
     explanation:
       'Loans and mortgages have a balance owed, an interest rate, a monthly payment and a due day. The balance is what’s left to pay. It isn’t a payment and isn’t subtracted from your income.',
     keyClue: {
@@ -223,6 +231,7 @@ export const TOUR_SECTIONS: TourSection[] = [
     id: 'missions',
     title: 'Missions and Budget Buddy',
     route: '/',
+    contentTarget: 'tour-missions',
     navTarget: 'index',
     lookFor: 'Budget missions on the Dashboard, and the Budget Buddy button.',
     explanation:

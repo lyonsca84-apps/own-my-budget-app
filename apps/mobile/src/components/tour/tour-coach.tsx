@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Layout, Radius, Space } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useTour } from '@/contexts/tour-context';
+import { useReducedMotion } from '@/components/savings/use-reduced-motion';
+import { useTourSpotlight } from '@/components/tour/use-tour-spotlight';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Screens the tour can sit on top of. Anything else (a form, Settings…) hides it. */
@@ -29,6 +31,8 @@ const TOUR_SURFACES = new Set([
 ]);
 
 type Phase = 'explain' | 'ask' | 'saved';
+
+const TOUR_PANEL_ID = 'tour-panel';
 
 /**
  * Budget Buddy's coach panel for the guided tour. It docks beside the real
@@ -46,7 +50,6 @@ export function TourCoach() {
   const isWide = width >= Layout.sidebarBreakpoint;
 
   const [phase, setPhase] = useState<Phase>('explain');
-  const [minimized, setMinimized] = useState(false);
   const [noNewNote, setNoNewNote] = useState(false);
   const [justFinished, setJustFinished] = useState(false);
   // Set while one of the existing forms is open from the tour.
@@ -81,15 +84,31 @@ export function TourCoach() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Escape minimizes the panel on web (it never traps focus).
-  useEffect(() => {
-    if (Platform.OS !== 'web' || state.status !== 'active') return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMinimized(true);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [state.status]);
+  // The full panel is up only on the section's own screen; that's also when
+  // the page dims around the spotlighted tab and its content (web).
+  const onSection = pathname === section.route;
+  const panelOpen = status === 'signedIn' && tour.loaded && state.status === 'active' && onSection;
+  const navId =
+    !isWide && (section.navTarget === 'grocery' || section.navTarget === 'reports')
+      ? 'nav-more'
+      : `nav-${section.navTarget}`;
+  const reducedMotion = useReducedMotion() !== false;
+
+  /** Exit: progress is kept (resume from the Dashboard or Settings); focus returns to the tab. */
+  const exitTour = () => {
+    tour.pause();
+    if (Platform.OS === 'web') {
+      setTimeout(() => document.querySelector<HTMLElement>(`[id="${navId}"]`)?.focus(), 0);
+    }
+  };
+
+  useTourSpotlight({
+    active: panelOpen,
+    targetIds: [navId, section.contentTarget ?? 'tour-screen'],
+    panelId: TOUR_PANEL_ID,
+    reducedMotion,
+    onEscape: exitTour,
+  });
 
   if (status !== 'signedIn' || !tour.loaded) return null;
 
@@ -99,6 +118,14 @@ export function TourCoach() {
     ...(isWide
       ? { right: Space[7], bottom: 104, width: 400 }
       : { left: Space[3], right: Space[3], bottom: Platform.OS === 'web' ? 76 : 100 }),
+  };
+  // During the tour the panel is fixed in the upper-right corner.
+  const topDock = {
+    position: 'absolute' as const,
+    zIndex: 50,
+    ...(isWide
+      ? { top: Space[4], right: Space[4], width: 360 }
+      : { top: Space[2], right: Space[2], left: Space[7] }),
   };
   const panelStyle = {
     backgroundColor: theme.backgroundElement,
@@ -167,17 +194,12 @@ export function TourCoach() {
   // A form or another screen is open: step aside completely.
   if (!TOUR_SURFACES.has(pathname)) return null;
 
-  const onSection = pathname === section.route;
-
-  if (minimized || !onSection) {
+  if (!onSection) {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Continue the tour with Budget Buddy: ${section.title}, ${tourProgressLabel(state.current)}`}
-        onPress={() => {
-          setMinimized(false);
-          if (!onSection) tour.showSection();
-        }}
+        onPress={tour.showSection}
         style={[
           dock,
           panelStyle,
@@ -234,13 +256,14 @@ export function TourCoach() {
 
   return (
     <View
+      nativeID={TOUR_PANEL_ID}
       aria-label="Budget Buddy guided tour"
-      style={[dock, panelStyle, { maxHeight: isWide ? '56%' : '50%' }]}
+      style={[topDock, panelStyle, { maxHeight: isWide ? '86%' : '60%' }]}
     >
-      <ScrollView contentContainerStyle={{ padding: Space[5], gap: Space[4] }}>
-        {/* Progress, title and controls */}
+      <ScrollView contentContainerStyle={{ padding: isWide ? Space[5] : Space[4], gap: Space[3] }}>
+        {/* Progress, title and the exit control */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space[2] }}>
-          <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flex: 1, gap: 2 }} accessibilityLiveRegion="polite">
             <ThemedText type="small" themeColor="textSecondary">
               {tourProgressLabel(state.current)}
             </ThemedText>
@@ -249,20 +272,16 @@ export function TourCoach() {
             </ThemedText>
           </View>
           <Button
-            label="Minimize"
+            label="Exit tour"
             size="sm"
             variant="quiet"
-            onPress={() => setMinimized(true)}
-            accessibilityLabel="Minimize the tour panel"
-          />
-          <Button
-            label="Pause"
-            size="sm"
-            variant="quiet"
-            onPress={tour.pause}
-            accessibilityLabel="Pause the tour. You can resume it from your dashboard."
+            onPress={exitTour}
+            accessibilityLabel="Exit the tour. Your progress is kept; resume it from your dashboard or Settings."
           />
         </View>
+        <ThemedText type="small" themeColor="textSecondary">
+          Highlighted: {section.lookFor}
+        </ThemedText>
         <View
           accessibilityElementsHidden
           style={{ height: 6, borderRadius: 3, backgroundColor: theme.backgroundSelected }}
@@ -279,7 +298,7 @@ export function TourCoach() {
 
         {/* Budget Buddy and what he's saying */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Space[3] }}>
-          <BuddyMascot mood={mood} size={64} />
+          <BuddyMascot mood={mood} size={isWide ? 56 : 44} />
           <View
             style={{
               flex: 1,
@@ -301,11 +320,6 @@ export function TourCoach() {
                     } on this tab.`
                   : (interview?.question ?? '')}
             </ThemedText>
-            {phase === 'explain' ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                Look for: {section.lookFor}
-              </ThemedText>
-            ) : null}
           </View>
         </View>
 

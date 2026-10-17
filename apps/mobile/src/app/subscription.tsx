@@ -20,6 +20,28 @@ const STATUS_LABEL: Record<string, string> = {
   canceled: 'Canceled',
 };
 
+function longDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** "$9.99 per month" from Stripe's price, or null when Stripe hasn't reported it yet. */
+function formatPrice(
+  cents: number | null | undefined,
+  currency: string | null | undefined,
+  interval: string | null | undefined
+): string | null {
+  if (cents == null || !interval) return null;
+  const amount = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: (currency ?? 'usd').toUpperCase(),
+  }).format(cents / 100);
+  return `${amount} per ${interval === 'year' ? 'year' : 'month'}`;
+}
+
 const STATUS_TONE: Record<string, StatusTone> = {
   active: 'success',
   trialing: 'success',
@@ -73,6 +95,16 @@ export default function SubscriptionScreen() {
   const { entitlement } = account;
   const planTier = entitlement.plan_tier as PlanTier;
   const isPaid = planTier !== 'free';
+  // Price, interval and a scheduled cancellation come from Stripe via the
+  // stripe-webhook function (never from a client redirect).
+  const price = formatPrice(
+    entitlement.price_amount_cents,
+    entitlement.price_currency,
+    entitlement.billing_interval
+  );
+  const endsOn = entitlement.cancel_at_period_end
+    ? (entitlement.cancel_at ?? entitlement.current_period_end)
+    : entitlement.cancel_at;
 
   return (
     <Screen>
@@ -85,23 +117,54 @@ export default function SubscriptionScreen() {
           />
         }
       >
+        {isPaid ? (
+          <ThemedText>
+            {price ?? 'Price and billing period appear here after Stripe’s next update.'}
+          </ThemedText>
+        ) : (
+          <ThemedText themeColor="textSecondary">$0. No payment method needed.</ThemedText>
+        )}
         {entitlement.status === 'trialing' && entitlement.trial_ends_at ? (
           <ThemedText themeColor="textSecondary">
-            Trial ends {new Date(entitlement.trial_ends_at).toLocaleDateString()}
+            Trial ends {longDate(entitlement.trial_ends_at)}
           </ThemedText>
         ) : null}
-        {isPaid && entitlement.current_period_end ? (
+        {isPaid && endsOn ? (
+          <ThemedText themeColor="warning">
+            Cancels on {longDate(endsOn)}. You keep {TIER_LABELS[planTier]} until then, then your
+            account moves to the Free plan.
+          </ThemedText>
+        ) : isPaid && entitlement.current_period_end ? (
           <ThemedText themeColor="textSecondary">
-            Renews {new Date(entitlement.current_period_end).toLocaleDateString()}
+            Renews {longDate(entitlement.current_period_end)}
+          </ThemedText>
+        ) : null}
+        {entitlement.status === 'past_due' ? (
+          <ThemedText themeColor="warning">
+            Stripe couldn’t take the last payment. Update your payment method in Manage subscription
+            to keep your plan.
           </ThemedText>
         ) : null}
       </SectionCard>
+
+      {isPaid ? (
+        <SectionCard title="If you cancel">
+          <ThemedText themeColor="textSecondary">
+            Cancel from Manage subscription, Stripe’s secure billing page. Stripe shows exactly when
+            your access ends before you confirm, and nothing is canceled until you confirm there.
+          </ThemedText>
+          <ThemedText themeColor="textSecondary">
+            Once Stripe confirms, this page shows your end date. When a paid plan ends, your account
+            moves to the Free plan and your budget data stays in your account.
+          </ThemedText>
+        </SectionCard>
+      ) : null}
 
       {errorMessage ? <ThemedText themeColor="danger">{errorMessage}</ThemedText> : null}
 
       {isPaid ? (
         <Button
-          label={isOpeningPortal ? 'Opening…' : 'Manage subscription'}
+          label={isOpeningPortal ? 'Opening…' : 'Manage or cancel subscription'}
           variant="secondary"
           onPress={handleManageSubscription}
           disabled={isOpeningPortal}
