@@ -42,6 +42,22 @@ export async function updateIncomeSource(
   return data;
 }
 
+/** Onboarding retries reuse the same IDs, including after a lost response or reload.
+ * Conflicting rows are left untouched, so later edits to a saved source are preserved.
+ */
+export async function saveOnboardingIncomeSources(
+  client: TypedSupabaseClient,
+  userId: string,
+  sources: (Omit<TablesInsert<'income_sources'>, 'user_id' | 'id'> & { id: string })[]
+): Promise<void> {
+  if (sources.length === 0) return;
+  const { error } = await client.from('income_sources').upsert(
+    sources.map((source) => ({ ...source, user_id: userId })),
+    { onConflict: 'id', ignoreDuplicates: true }
+  );
+  if (error) throw error;
+}
+
 export async function createIncomeSource(
   client: TypedSupabaseClient,
   incomeSource: TablesInsert<'income_sources'>

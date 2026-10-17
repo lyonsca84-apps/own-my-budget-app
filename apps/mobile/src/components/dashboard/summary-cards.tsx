@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 export interface SummaryCardData {
   label: string;
-  cents: number;
+  cents: number | null;
   glyph: string;
   glyphColor: ThemeColor;
   glyphTint: ThemeColor;
@@ -62,9 +62,9 @@ export function SummaryCards({ cards }: { cards: SummaryCardData[] }) {
               letterSpacing: -0.26,
               fontVariant: ['tabular-nums'],
             }}
-            accessibilityLabel={`${card.label}: ${formatCents(card.cents)}`}
+            accessibilityLabel={`${card.label}: ${card.cents === null ? 'Not added yet' : formatCents(card.cents)}`}
           >
-            {formatCents(card.cents)}
+            {card.cents === null ? 'Not added yet' : formatCents(card.cents)}
           </ThemedText>
           <Caption bold color={NOTE_COLOR[card.note.tone]}>
             {card.note.text}

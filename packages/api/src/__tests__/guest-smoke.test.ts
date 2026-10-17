@@ -461,6 +461,36 @@ describe('write paths, on the same code as a signed-in user', () => {
     expect(await api.listPaydayAssignments(client, uid)).toEqual([]);
   });
 
+  it('onboarding income retries neither duplicate sources nor overwrite later edits', async () => {
+    const sources = [
+      {
+        id: '1d931172-5555-4b3d-8355-e72c0fa17d40',
+        label: 'Take-home pay',
+        amount_cents: 85000,
+        frequency: 'weekly' as const,
+        next_pay_date: '2026-09-25',
+      },
+      {
+        id: '2d931172-5555-4b3d-8355-e72c0fa17d40',
+        label: 'Estimated income',
+        amount_cents: 10000,
+        frequency: 'monthly' as const,
+        is_variable: true,
+      },
+    ];
+    const before = (await api.listIncomeSources(client, uid)).length;
+    await use('saveOnboardingIncomeSources', () =>
+      api.saveOnboardingIncomeSources(client, uid, sources)
+    );
+    await api.updateIncomeSource(client, sources[0].id, { amount_cents: 90000 });
+    await api.saveOnboardingIncomeSources(client, uid, sources);
+    expect((await api.listIncomeSources(client, uid)).length).toBe(before + 2);
+    expect((await api.getIncomeSource(client, sources[0].id)).amount_cents).toBe(90000);
+    expect((await api.getIncomeSource(client, sources[1].id)).is_variable).toBe(true);
+    await api.saveOnboardingIncomeSources(client, uid, []);
+    expect((await api.listIncomeSources(client, uid)).length).toBe(before + 2);
+  });
+
   it('income sources', async () => {
     const created = await use('createIncomeSource', () =>
       api.createIncomeSource(client, {

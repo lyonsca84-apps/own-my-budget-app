@@ -112,10 +112,14 @@ export interface DashboardPaycheck {
   remainingCents: number;
 }
 
+export type SetupPiece = 'income' | 'bills' | 'debts' | 'goals';
+
 export interface DashboardModel {
   displayName: string;
   /** True when the account has nothing to build a picture from yet. */
   isEmpty: boolean;
+  /** Setup pieces with nothing saved yet, in the order the setup card offers them. */
+  setupMissing: SetupPiece[];
   income: { cents: number; change: ChangeNote };
   billsAndPayments: { cents: number; paidCount: number; totalCount: number };
   savings: { cents: number; change: ChangeNote };
@@ -496,9 +500,23 @@ export function buildDashboardModel(
       raw.bills.length === 0 &&
       raw.debts.length === 0 &&
       raw.goals.length === 0,
+    setupMissing: (
+      [
+        ['income', raw.incomeSources.length],
+        ['bills', raw.bills.length],
+        ['debts', raw.debts.length],
+        ['goals', raw.goals.length],
+      ] as const
+    )
+      .filter(([, count]) => count === 0)
+      .map(([piece]) => piece),
     income: {
       cents: incomeCents,
-      change: describeChange(incomeCents, hasPrevious ? prevIncomeCents : null),
+      // No pay schedule yet: say so rather than presenting $0 as a known figure.
+      change:
+        raw.incomeSources.length === 0
+          ? { text: 'Not added yet', tone: 'neutral' }
+          : describeChange(incomeCents, hasPrevious ? prevIncomeCents : null),
     },
     billsAndPayments: {
       cents: billsTotalCents + debtDueCents,

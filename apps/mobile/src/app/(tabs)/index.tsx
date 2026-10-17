@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 
@@ -12,6 +11,7 @@ import { GoalsCard } from '@/components/dashboard/goals-card';
 import { HealthCard } from '@/components/dashboard/health-card';
 import { InsightsCard, MissionsCard, TipCard } from '@/components/dashboard/insight-cards';
 import { NextPaycheckCard } from '@/components/dashboard/next-paycheck-card';
+import { SetupCard } from '@/components/dashboard/setup-card';
 import { SnapshotGrid } from '@/components/dashboard/snapshot-grid';
 import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { UpcomingBillsCard } from '@/components/dashboard/upcoming-bills-card';
@@ -79,46 +79,17 @@ export default function DashboardScreen() {
         </Card>
       ) : (
         <>
-          {model.isEmpty ? (
-            <Card style={{ alignItems: 'center', gap: Space[2], padding: Space[7] }}>
-              <ThemedText type="smallBold" style={{ fontSize: 17 }}>
-                Let&rsquo;s build your budget picture
-              </ThemedText>
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={{ textAlign: 'center', maxWidth: 420 }}
-              >
-                Add your income and monthly bills to see your complete budget picture.
-              </ThemedText>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: Space[2],
-                  marginTop: Space[2],
-                }}
-              >
-                <Button
-                  label="Add income"
-                  shape="rounded"
-                  onPress={() => router.push('/add-income')}
-                />
-                <Button
-                  label="Add a bill"
-                  variant="outline"
-                  shape="rounded"
-                  onPress={() => router.push('/add-bill')}
-                />
-              </View>
-            </Card>
-          ) : null}
+          <SetupCard
+            isEmpty={model.isEmpty}
+            missing={model.setupMissing}
+            userId={status === 'signedIn' ? (user?.id ?? null) : null}
+          />
 
           <SummaryCards
             cards={[
               {
                 label: 'Total Income',
-                cents: model.income.cents,
+                cents: model.setupMissing.includes('income') ? null : model.income.cents,
                 glyph: '↗',
                 glyphColor: 'solidAccent',
                 glyphTint: 'accentMuted',
@@ -127,33 +98,44 @@ export default function DashboardScreen() {
               },
               {
                 label: 'Bills and Payments',
-                cents: model.billsAndPayments.cents,
+                cents:
+                  model.setupMissing.includes('bills') && model.setupMissing.includes('debts')
+                    ? null
+                    : model.billsAndPayments.cents,
                 glyph: '≡',
                 glyphColor: 'text',
                 glyphTint: 'backgroundSelected',
                 note: {
-                  text: `${model.billsAndPayments.paidCount} of ${model.billsAndPayments.totalCount} bills paid`,
+                  text: model.setupMissing.includes('bills')
+                    ? 'Add your bills when you’re ready'
+                    : `${model.billsAndPayments.paidCount} of ${model.billsAndPayments.totalCount} bills paid`,
                   tone: 'neutral',
                 },
                 help: 'Everything due this month across bills, cards and loans.',
               },
               {
                 label: 'Savings',
-                cents: model.savings.cents,
+                cents: model.setupMissing.includes('goals') ? null : model.savings.cents,
                 glyph: '◆',
                 glyphColor: 'success',
                 glyphTint: 'successMuted',
-                note: model.savings.change,
+                note: model.setupMissing.includes('goals')
+                  ? { text: 'Add a savings goal when you’re ready', tone: 'neutral' }
+                  : model.savings.change,
                 help: 'Money you moved into savings goals this month.',
               },
               {
                 label: 'Money Available',
-                cents: model.available.cents,
+                cents: model.setupMissing.includes('income') ? null : model.available.cents,
                 glyph: '●',
                 glyphColor: 'primary',
                 glyphTint: 'primaryMuted',
-                note: model.available.change,
-                help: 'What is left after bills, debt, spending and savings.',
+                note: model.setupMissing.includes('income')
+                  ? { text: 'Add income to see this amount', tone: 'neutral' }
+                  : model.setupMissing.includes('bills')
+                    ? { text: 'Based on what you’ve added so far', tone: 'neutral' }
+                    : model.available.change,
+                help: 'Income left after recorded bills, debt, spending and savings. This is not your bank balance.',
               },
             ]}
           />
@@ -170,6 +152,7 @@ export default function DashboardScreen() {
               <CashFlowCard
                 periodLabel={periodLabel}
                 cashFlow={model.cashFlow}
+                setupMissing={model.setupMissing}
                 chartBars={model.chartBars}
               />
               <UpcomingBillsCard bills={model.upcomingBills} />

@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Caption, DashCard } from '@/components/dashboard/common';
+import type { SetupPiece } from './model';
 import { MONTH_SHORT } from '@/components/dashboard/format';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Space } from '@/constants/theme';
@@ -16,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 export interface CashFlowCardProps {
   periodLabel: string;
+  setupMissing?: SetupPiece[];
   cashFlow: CashFlow;
   chartBars: (range: ChartRangeKey) => ChartBar[];
 }
@@ -32,7 +34,12 @@ const FIGURES: { key: string; label: string }[] = [
 const CHART_HEIGHT = 130;
 
 /** Six month figures, the stacked "where your income goes" bar, and the income-vs-spending chart with range tabs. */
-export function CashFlowCard({ periodLabel, cashFlow, chartBars }: CashFlowCardProps) {
+export function CashFlowCard({
+  periodLabel,
+  cashFlow,
+  chartBars,
+  setupMissing = [],
+}: CashFlowCardProps) {
   const theme = useTheme();
   const [range, setRange] = useState<ChartRangeKey>('quarter');
   const bars = useMemo(() => chartBars(range), [chartBars, range]);
@@ -44,6 +51,15 @@ export function CashFlowCard({ periodLabel, cashFlow, chartBars }: CashFlowCardP
     variable: cashFlow.variableCents,
     savings: cashFlow.savingsCents,
     available: cashFlow.availableCents,
+  };
+  const missing = new Set(setupMissing);
+  const unknown: Record<string, boolean> = {
+    income: missing.has('income'),
+    bills: missing.has('bills'),
+    debt: missing.has('debts'),
+    savings: missing.has('goals'),
+    variable: false,
+    available: missing.has('income'),
   };
   const segmentColor: Record<string, string> = {
     bills: theme.panel,
@@ -77,12 +93,18 @@ export function CashFlowCard({ periodLabel, cashFlow, chartBars }: CashFlowCardP
                   fontVariant: ['tabular-nums'],
                 }}
               >
-                {formatCents(cents)}
+                {unknown[figure.key] ? 'Not added yet' : formatCents(cents)}
               </ThemedText>
             </View>
           );
         })}
       </View>
+
+      {missing.has('income') || missing.has('bills') ? (
+        <Caption>
+          Based on what you’ve added so far. Add income and bills for a fuller picture.
+        </Caption>
+      ) : null}
 
       <View
         accessible
@@ -129,7 +151,9 @@ export function CashFlowCard({ periodLabel, cashFlow, chartBars }: CashFlowCardP
               {s.label}
             </ThemedText>
             <Caption style={{ fontSize: 13, lineHeight: 18 }}>
-              {formatCents(s.cents)} · {Math.round(s.percent)}%
+              {unknown[s.key]
+                ? 'Not added yet'
+                : `${formatCents(s.cents)} · ${Math.round(s.percent)}%`}
             </Caption>
           </View>
         ))}
