@@ -488,10 +488,24 @@ function ProfilePanel({
           >
             {form.message.text}
           </ThemedText>
-        ) : form.dirty ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            You have unsaved changes. Use Save changes at the top of the page.
-          </ThemedText>
+        ) : null}
+        {form.dirty ? (
+          // Same actions as the page header, here too so a long form never needs a scroll back up.
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space[2] }}
+          >
+            <Button
+              label={form.saving ? 'Saving…' : 'Save changes'}
+              variant="panel"
+              size="sm"
+              onPress={form.save}
+              disabled={form.saving || !form.valid}
+            />
+            <Button label="Cancel" variant="outline" size="sm" onPress={form.requestCancel} />
+            <ThemedText type="small" themeColor="textSecondary">
+              You have unsaved changes.
+            </ThemedText>
+          </View>
         ) : null}
       </View>
 
