@@ -409,6 +409,7 @@ function ProfilePanel({
 
       <ImageControl
         kind="avatar"
+        first
         title="Profile photo"
         help="Optional. Shown on your avatar in the app. PNG, JPG or WebP, up to 5 MB."
         currentUrl={images.avatarUrl}
@@ -523,8 +524,11 @@ function ImageControl({
   currentUrl,
   hasImage,
   preview,
+  first,
 }: {
   kind: 'avatar' | 'logo';
+  /** The first block under the panel heading draws no extra divider. */
+  first?: boolean;
   title: string;
   help: string;
   currentUrl: string | null;
@@ -600,8 +604,8 @@ function ImageControl({
     <View
       style={{
         gap: Space[3],
-        paddingTop: Space[4],
-        borderTopWidth: 1,
+        paddingTop: first ? 0 : Space[4],
+        borderTopWidth: first ? 0 : 1,
         borderTopColor: theme.border,
       }}
     >
