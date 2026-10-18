@@ -355,6 +355,34 @@ describe('write paths, on the same code as a signed-in user', () => {
     expect(n.bill_reminder_days_before).toBe(5);
   });
 
+  it('profile photo and logo: upload, replace (old file removed), remove', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const nameBefore = (await api.getProfile(client, uid)).display_name;
+    const first = await use('uploadProfileImage', () =>
+      api.uploadProfileImage(client, uid, 'logo', png, 'image/png', 'png')
+    );
+    expect(first.logo_path).toMatch(new RegExp(`^${uid}/logo-\\d+\\.png$`));
+    const url = await use('getProfileImageUrl', () =>
+      api.getProfileImageUrl(client, first.logo_path!)
+    );
+    expect(url).toContain(first.logo_path!);
+
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = await api.uploadProfileImage(client, uid, 'logo', png, 'image/png', 'png');
+    expect(second.logo_path).not.toBe(first.logo_path);
+    const { data: files } = await client.storage.from(api.PROFILE_IMAGES_BUCKET).list(uid);
+    const names = (files ?? []).map((f: { name: string }) => f.name);
+    expect(names.some((n: string) => n.endsWith(second.logo_path!.split('/')[1]))).toBe(true);
+    expect(names.some((n: string) => n.endsWith(first.logo_path!.split('/')[1]))).toBe(false);
+
+    const cleared = await use('removeProfileImage', () =>
+      api.removeProfileImage(client, uid, 'logo')
+    );
+    expect(cleared.logo_path).toBeNull();
+    // Only the logo changed; the rest of the profile is untouched.
+    expect(cleared.display_name).toBe(nameBefore);
+  });
+
   it('accounts', async () => {
     const created = await use('createAccount', () =>
       api.createAccount(client, { user_id: uid, label: 'Cash', type: 'cash' })

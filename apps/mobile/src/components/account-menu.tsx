@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Fonts, Layout, Radius, Space } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useProfileImages } from '@/lib/profile-images';
 
 type Anchor = { x: number; y: number; width: number; height: number };
 
@@ -40,6 +41,7 @@ export function AccountMenu({
   const { width, height } = useWindowDimensions();
   const isWide = width >= Layout.sidebarBreakpoint;
   const isGuest = status === 'guest';
+  const { avatarUrl } = useProfileImages();
 
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
@@ -89,7 +91,7 @@ export function AccountMenu({
         },
       ]
     : [
-        { label: 'Profile', onPress: () => go('/profile') },
+        { label: 'Profile', onPress: () => go('/settings?section=profile') },
         { label: 'Settings', onPress: () => go('/settings') },
         { label: 'Subscription & plan', onPress: () => go('/subscription') },
         {
@@ -138,7 +140,7 @@ export function AccountMenu({
             : { borderRadius: Radius.full }),
         })}
       >
-        <Avatar name={name} size={avatarSize} />
+        <Avatar name={name} size={avatarSize} imageUri={avatarUrl} />
         {variant === 'row' ? (
           <>
             <ThemedText

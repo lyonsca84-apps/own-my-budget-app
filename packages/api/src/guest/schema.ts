@@ -82,6 +82,11 @@ export const TABLES: Record<string, TableDef> = {
       created_at: createdAt(),
       updated_at: updatedAt(),
       onboarding_completed_at: timestamp(),
+      age_range: text({
+        oneOf: ['under_18', '18_24', '25_34', '35_44', '45_54', '55_64', '65_plus'],
+      }),
+      avatar_path: text(),
+      logo_path: text(),
     },
     unique: [],
     owner: 'id',

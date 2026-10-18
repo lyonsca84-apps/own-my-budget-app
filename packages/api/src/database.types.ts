@@ -1102,28 +1102,37 @@ export type Database = {
       };
       profiles: {
         Row: {
+          age_range: string | null;
+          avatar_path: string | null;
           created_at: string;
           currency: string;
           display_name: string;
           id: string;
+          logo_path: string | null;
           onboarding_completed_at: string | null;
           timezone: string;
           updated_at: string;
         };
         Insert: {
+          age_range?: string | null;
+          avatar_path?: string | null;
           created_at?: string;
           currency?: string;
           display_name?: string;
           id: string;
+          logo_path?: string | null;
           onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
         };
         Update: {
+          age_range?: string | null;
+          avatar_path?: string | null;
           created_at?: string;
           currency?: string;
           display_name?: string;
           id?: string;
+          logo_path?: string | null;
           onboarding_completed_at?: string | null;
           timezone?: string;
           updated_at?: string;
