@@ -168,9 +168,15 @@ export default function SubscriptionScreen() {
           variant="secondary"
           onPress={handleManageSubscription}
           disabled={isOpeningPortal}
+          style={{ alignSelf: 'flex-start' }}
         />
       ) : (
-        <Button label="Upgrade" variant="panel" onPress={() => router.push('/paywall')} />
+        <Button
+          label="Upgrade"
+          variant="panel"
+          onPress={() => router.push('/paywall')}
+          style={{ alignSelf: 'flex-start' }}
+        />
       )}
     </Screen>
   );

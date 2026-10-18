@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { MONTH_NAMES } from '@/components/dashboard/format';
 import { ThemedText } from '@/components/themed-text';
-import { Avatar } from '@/components/ui/avatar';
+import { AccountMenu } from '@/components/account-menu';
 import { Button } from '@/components/ui/button';
 import { GreetingHero } from '@/components/ui/greeting-hero';
 import { PageHeader } from '@/components/ui/page-header';
@@ -90,14 +90,7 @@ export function DashboardHeader({
               onChange={(value) => onYearChange(Number(value))}
               options={years.map((y) => ({ value: String(y), label: String(y) }))}
             />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Open settings"
-              onPress={() => router.push('/settings')}
-              hitSlop={4}
-            >
-              <Avatar name={name} size={44} />
-            </Pressable>
+            <AccountMenu variant="avatar" name={name} avatarSize={44} />
             <Button
               label="+ Add Transaction"
               variant="panel"

@@ -8,8 +8,7 @@ import { Pressable, useWindowDimensions, View, type ViewStyle } from 'react-nati
 import { getCurrentAccount } from '@own-my-budget/api';
 import { PLAN_PRICING, type PlanTier } from '@own-my-budget/core';
 
-import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { AccountMenu } from '@/components/account-menu';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/contexts/auth-context';
@@ -194,7 +193,7 @@ export function NavListChrome({
 
 function AccountSummary() {
   const theme = useTheme();
-  const { status, user, exitGuestMode, signOut } = useAuth();
+  const { status, user, exitGuestMode } = useAuth();
   const isGuest = status === 'guest';
   const name = isGuest ? 'Guest Mode' : (user?.email?.split('@')[0] ?? 'Account');
 
@@ -240,36 +239,11 @@ function AccountSummary() {
     );
   }
 
-  // Signed in: who you are, plus separate Profile, Settings and Log out controls.
+  // Signed in: avatar · name · ⋮, which opens the account menu (Profile,
+  // Settings, Subscription & plan, Log out).
   return (
-    <View
-      style={{
-        gap: Spacing.one,
-        padding: Spacing.two,
-        borderRadius: Radius.input,
-        backgroundColor: theme.background,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-        <Avatar name={name} size={32} />
-        <ThemedText
-          type="smallBold"
-          style={{ fontSize: 14, lineHeight: 18, flexShrink: 1 }}
-          numberOfLines={1}
-        >
-          {name}
-        </ThemedText>
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -Spacing.two }}>
-        <Button label="Profile" size="sm" variant="quiet" onPress={() => router.push('/profile')} />
-        <Button
-          label="Settings"
-          size="sm"
-          variant="quiet"
-          onPress={() => router.push('/settings')}
-        />
-        <Button label="Log out" size="sm" variant="quiet" onPress={() => signOut()} />
-      </View>
+    <View style={{ borderRadius: Radius.input, backgroundColor: theme.background }}>
+      <AccountMenu variant="row" name={name} />
     </View>
   );
 }

@@ -291,6 +291,8 @@ export const Radius = {
 export const Layout = {
   minimumTouchTarget: 44,
   controlHeight: 52,
+  /** Widest a stretched action button may grow (forms and dialogs are narrower). */
+  buttonMaxWidth: 560,
   cardPadding: Space[7],
   cardGap: Space[5],
   sectionGap: Space[12],

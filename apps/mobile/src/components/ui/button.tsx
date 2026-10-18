@@ -125,6 +125,9 @@ export function Button({
       style={({ pressed }) => [
         {
           minHeight: height,
+          // Buttons stretch with their column; this cap keeps them from running
+          // edge to edge on wide pages (forms and dialogs are narrower than it).
+          maxWidth: Layout.buttonMaxWidth,
           borderRadius: shape === 'rounded' ? Radius.input : Radius.full,
           paddingHorizontal: size === 'sm' ? 16 : fill && variant !== 'soft' ? 26 : 20,
           alignItems: 'center',
